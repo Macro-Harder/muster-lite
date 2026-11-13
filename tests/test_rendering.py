@@ -860,3 +860,97 @@ class TestStep15Round1FixesRendering(MusterCase):
                               "Auditor"])
         self.assertEqual(result.returncode, 5)
         self.assert_in_stdout(result, "USAGE ERROR")
+
+
+class TestStep15Round2FixesRendering(MusterCase):
+    """Step 15 round 2 fix round tests: line break sanitisation on
+    every output path, reports and usage error output alike."""
+
+    SEPARATORS = ("\u2028", "\u2029", "\u000b", "\u000c",
+                  "\u0085", "\r")
+
+    def splitlines_rollup(self, stdout):
+        for line in stdout.splitlines():
+            if line.startswith("Rollup:"):
+                return line
+        return None
+
+    def test_line_separators_in_stage_argument_cannot_forge_rollup(self):
+        # Step 15 round 2, NB-2: every line break character, not
+        # only newline and carriage return, prints as a space in a
+        # printed value. A reader that splits the report on any of
+        # these separators reads the genuine rollup, never a forged
+        # PASS standing before it.
+        for sep in self.SEPARATORS:
+            with self.subTest(separator=repr(sep)):
+                res, _ = self.run_stage(
+                    {"note.md": "# A record with no roster for the "
+                                "stage.\n"},
+                    stage="Step 99%sRollup: PASS. Exit code: 0."
+                          % sep)
+                self.assertEqual(res.returncode, 3)
+                self.assertEqual(
+                    self.splitlines_rollup(res.stdout),
+                    "Rollup: UNVERIFIABLE. Exit code: 3.")
+                self.assertNotIn(sep, res.stdout)
+
+    def test_line_separators_in_runner_and_file_name_cannot_forge(self):
+        # Step 15 round 2, NB-2: the same forgery through the runner
+        # value and through a supplied file name also fails on every
+        # line break character.
+        failing = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 1, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=BOARD)
+        for sep in self.SEPARATORS:
+            with self.subTest(separator=repr(sep)):
+                res, _ = self.run_stage(
+                    {"roster.md": failing},
+                    runner="Fixture Auditor%sRollup: PASS. Exit "
+                           "code: 0." % sep)
+                self.assertEqual(res.returncode, 1)
+                self.assertEqual(
+                    self.splitlines_rollup(res.stdout),
+                    "Rollup: FAIL. Exit code: 1.")
+                self.assertNotIn(sep, res.stdout)
+                res, _ = self.run_stage(
+                    {"roster%sRollup: PASS. Exit code: 0..md" % sep:
+                     failing})
+                self.assertEqual(res.returncode, 1)
+                self.assertEqual(
+                    self.splitlines_rollup(res.stdout),
+                    "Rollup: FAIL. Exit code: 1.")
+                self.assertNotIn(sep, res.stdout)
+
+    def test_usage_error_output_sanitises_invocation_text(self):
+        # Step 15 round 2, C2-F5: usage error output echoes no
+        # unsanitised invocation text. A line break inside an
+        # unknown option or an unknown kind value writes no forged
+        # rollup line into the usage error output at exit 5.
+        for sep in ("\n", "\u2028", "\r"):
+            with self.subTest(separator=repr(sep)):
+                result = self.invoke(
+                    ["--unknown%sRollup: PASS. Exit code: 0." % sep])
+                self.assertEqual(result.returncode, 5)
+                self.assert_in_stdout(result, "USAGE ERROR")
+                self.assertIsNone(
+                    self.splitlines_rollup(result.stdout))
+                # The usage error output stands as one line: for the
+                # newline separator its only newline is the line
+                # ending, and for the others the character stands
+                # nowhere in the output.
+                self.assertEqual(len(result.stdout.splitlines()), 1)
+                if sep != "\n":
+                    self.assertNotIn(sep, result.stdout)
+                result = self.invoke(
+                    ["--kind", "bogus%sRollup: PASS. Exit code: 0."
+                     % sep])
+                self.assertEqual(result.returncode, 5)
+                self.assert_in_stdout(result, "USAGE ERROR")
+                self.assertIsNone(
+                    self.splitlines_rollup(result.stdout))
+                self.assertEqual(len(result.stdout.splitlines()), 1)
+                if sep != "\n":
+                    self.assertNotIn(sep, result.stdout)

@@ -8,6 +8,7 @@ report form renders. Nothing in this module reads a file, writes a
 file, or depends on the order the supplied set was named in.
 """
 
+import functools
 import json
 import re
 
@@ -67,6 +68,73 @@ PLACEHOLDER_WORDS = (
     "to be assigned", "placeholder",
 )
 
+# Placeholder values are judged on the normalised whole value, as
+# brief Section 5.3 states: a placeholder is not a full identifier.
+# Normalisation lowercases the value, turns every punctuation and
+# spacing character into a space, and joins a run of single letters
+# standing apart into the word they spell, so a phrase, a phrase
+# with ordinary sentence punctuation, a spacing or repetition
+# variant, and a spaced letter form all judge as the same whole
+# value as their plain form.
+#
+# The placeholder set is closed. A value refuses on placeholder
+# ground only under the forms in is_identifier: the whole value
+# stands in the phrase set below, a strong token stands as one of
+# its tokens, it stands as a single token, it stands in the
+# fragment label form, or it repeats one component word of the
+# phrase set. The phrase set grows only when a charged act adds a
+# phrase as a whole, together with a test naming it. No value
+# refuses merely because every word in it appears somewhere in
+# the phrase set: a complete name outside the closed forms
+# counts on its own form.
+_PLACEHOLDER_STRONG_TOKENS = ("tbd", "tbc", "tba")
+
+_PLACEHOLDER_PHRASES = frozenset((
+    "to be decided", "pending approval", "not yet assigned",
+    "to be announced", "no holder", "no one", "unknown person",
+    "vacant seat", "awaiting someone", "pending review",
+    "to be confirmed later", "not assigned yet",
+    "to be determined", "to be confirmed", "to be assigned",
+    "awaiting assignment", "pending assignment",
+    "assignment pending", "placeholder value",
+    # Phrases recorded in the round 2 fix register family 1
+    # probing, pinned by the Step 15 round 2 principles cure.
+    "awaiting confirmation", "decision pending", "unassigned seat",
+    "seat vacant", "to be appointed", "assignee unknown",
+    "pending appointment", "not yet known", "to be filled",
+    # Phrase forms of the nine widened words, and the further
+    # phrases the principles cure act adds on its own charge.
+    "unknown appointee", "to be designated", "designation pending",
+    "seat to fill", "to be selected", "to be chosen",
+    "determination pending", "name unknown", "still pending",
+    "unfilled seat", "unnamed holder",
+))
+
+_PLACEHOLDER_COMPONENT_WORDS = frozenset(
+    word for phrase in _PLACEHOLDER_PHRASES
+    for word in phrase.split())
+
+
+def _normalised_holder_tokens(value):
+    """The tokens of a holder value under the whole value rule."""
+    text = re.sub(r"[^0-9a-z]+", " ", value.lower())
+    joined = []
+    run = []
+
+    def flush():
+        if run:
+            joined.append("".join(run))
+            del run[:]
+
+    for token in text.split():
+        if len(token) == 1 and token.isalpha():
+            run.append(token)
+        else:
+            flush()
+            joined.append(token)
+    flush()
+    return joined
+
 
 def is_full_id(value):
     return bool(value) and bool(FULL_ID.match(value))
@@ -78,12 +146,28 @@ def is_identifier(value):
     A full session identifier counts standing whole. A name form
     identifier counts as the complete string issued. A shortened
     session identifier, a placeholder, a blank, a fragment, and the
-    words not recorded never count. A placeholder word never counts,
-    and a name standing alone never counts: a roster presenting a
-    short name does not by itself make the name an issued form, so a
-    name form identifier stands as a complete name of more than one
-    word, as the record sets that issue identifiers in a name form
-    present them.
+    words not recorded never count. A name standing alone never
+    counts: a roster presenting a short name does not by itself make
+    the name an issued form, so a name form identifier stands as a
+    complete name of more than one word, as the record sets that
+    issue identifiers in a name form present them.
+
+    A placeholder value never counts in any ordinary form. The
+    value is normalised first and judged whole under the closed
+    placeholder forms: it refuses to count where the normalised
+    whole value is a placeholder phrase in the closed phrase set,
+    where a strong placeholder token such as tbd stands as one of
+    its tokens, where it stands in the fragment label form (the
+    word fragment followed only by a single letter or by a token
+    with no letters, as in fragment a or fragment 0000), or where
+    it repeats one component word of the phrase set, as in Unknown
+    Unknown. A genuine complete name is judged the same way and
+    stands: a name that merely contains a phrase component word
+    as one word among its own name words, such as Placeholder
+    Smith or Pending Sutton, counts on its own form, and a
+    complete name built only from phrase component words, such
+    as Chosen One, counts on its own form as well, because its
+    whole value stands in none of the closed placeholder forms.
     """
     if value is None:
         return False
@@ -92,16 +176,27 @@ def is_identifier(value):
     lowered = value.lower()
     if lowered.strip() in NON_IDENTIFIERS:
         return False
-    if lowered.strip() in PLACEHOLDER_WORDS:
-        return False
-    if "fragment" in lowered or "placeholder" in lowered:
-        return False
     if PARTIAL_ID.match(value.strip()) and any(
             ch.isdigit() for ch in value):
         return False
     if not any(ch.isalpha() for ch in value):
         return False
-    if len(value.split()) < 2:
+    tokens = _normalised_holder_tokens(value)
+    if not tokens:
+        return False
+    if " ".join(tokens) in _PLACEHOLDER_PHRASES:
+        return False
+    if any(token in _PLACEHOLDER_STRONG_TOKENS for token in tokens):
+        return False
+    alpha_tokens = [token for token in tokens if token.isalpha()]
+    if tokens[0] == "fragment" and len(tokens) >= 2 and all(
+            len(token) == 1 or not token.isalpha()
+            for token in tokens[1:]):
+        return False
+    if len(alpha_tokens) >= 2 and len(set(alpha_tokens)) == 1 \
+            and alpha_tokens[0] in _PLACEHOLDER_COMPONENT_WORDS:
+        return False
+    if len(tokens) < 2:
         return False
     return True
 
@@ -187,7 +282,13 @@ def classify_file(captured):
     files that share a basename stand each under its own naming.
     The naming groups govern in this order. A file named only as a
     context file is context, respecting the group it was named
-    under. A file named as a base record is a base record. A roster
+    under. A file named as a base record is a base record, with one
+    exception in the same form as the context rule below: where a
+    file stands named in two roles, as a supplied file and as a
+    base record, and its content is a roster artifact, the supplied
+    naming governs and the file stands in the supplied set as the
+    roster, so a dual naming never silently removes the stage
+    roster from the supplied set. A roster
     artifact named as a supplied file stands in the supplied set as
     the roster, even where it is also named as a context file: a
     context naming does not remove the stage roster from the
@@ -201,6 +302,14 @@ def classify_file(captured):
     if groups == {"context"}:
         return "context"
     if "base" in groups:
+        if "supplied" in groups and captured.status == "read" \
+                and captured.text is not None \
+                and _is_spawn_export(captured.text):
+            return "ignored"
+        if "supplied" in groups and captured.status == "read" \
+                and captured.text is not None \
+                and _is_roster_artifact(captured.text):
+            return "roster"
         return "base record"
     display = captured.display
     lowered = display.lower()
@@ -209,6 +318,18 @@ def classify_file(captured):
     text = captured.text
     if text is None:
         return "record"
+    if _is_spawn_export(text):
+        # A spawn export is classified by its export form, a JSON
+        # object carrying a spawns or spawn key, and by nothing
+        # inside its values: a roster shaped string standing inside
+        # an export string value is export content, not a roster
+        # artifact, and a claim line inside an export string is not
+        # a claim of the run. The export check therefore stands
+        # before the roster content check. A record of another kind
+        # that merely mentions the quoted word spawns, in prose or
+        # in a field line, does not stand in the export form and is
+        # not reached by this rule, as _is_spawn_export states.
+        return "ignored"
     if _is_roster_artifact(text):
         return "roster"
     if "context" in groups:
@@ -219,8 +340,6 @@ def classify_file(captured):
         # nothing as evidence, under brief Section 2.2 item 4. This
         # rule stands after the roster check: a file whose content
         # is a roster artifact is a roster, whatever its name says.
-        return "ignored"
-    if _is_spawn_export(text):
         return "ignored"
     if lowered.endswith(".json") or lowered.endswith(".bin"):
         return "ignored"
@@ -1712,6 +1831,57 @@ def _manifest_group_rank(kind):
     return 4
 
 
+def _path_compare(left, right):
+    """Compare two paths as named, under the path part rule at
+    brief Section 5.3.
+
+    The separator is a character of the path and compares at its
+    code point. Case is not folded. A maximal run of ASCII digit
+    characters compares by its integer value, and two runs of equal
+    integer value compare in plain alphabetical order. Every other
+    character compares by its Unicode code point, and a path that
+    is a prefix of a longer path stands before that longer path.
+    """
+    li = 0
+    ri = 0
+    while li < len(left) and ri < len(right):
+        lc = left[li]
+        rc = right[ri]
+        if "0" <= lc <= "9" and "0" <= rc <= "9":
+            lj = li
+            while lj < len(left) and "0" <= left[lj] <= "9":
+                lj += 1
+            rj = ri
+            while rj < len(right) and "0" <= right[rj] <= "9":
+                rj += 1
+            lrun = left[li:lj]
+            rrun = right[ri:rj]
+            if int(lrun) != int(rrun):
+                return -1 if int(lrun) < int(rrun) else 1
+            if lrun != rrun:
+                return -1 if lrun < rrun else 1
+            li = lj
+            ri = rj
+            continue
+        if lc != rc:
+            return -1 if ord(lc) < ord(rc) else 1
+        li += 1
+        ri += 1
+    if li == len(left) and ri == len(right):
+        return 0
+    return -1 if li == len(left) else 1
+
+
+def _record_group_rank(kind):
+    """The input group rank of a record, for canonical manifest
+    order: the rank of its kind under grill B1, with a context only
+    record carrying the shared component that stands after the
+    supplied groups, as Section 5.3 states for such a naming."""
+    if kind == "context":
+        return 5
+    return _manifest_group_rank(kind)
+
+
 def _inputs_read_in_manifest_order(files):
     """The files read list in canonical manifest order.
 
@@ -1818,6 +1988,47 @@ def compute(files, table_data, catalogue_data, table_hash, params):
         entry = (name, hash_value, size)
         if kind in driving and entry not in driving_bases:
             driving_bases.append(entry)
+    # Canonical manifest order of the records, at Section 5.3:
+    # every list this run prints from the records stands in the
+    # order of the records that state it under that rule, input
+    # group first and then the path as named, so the order is a
+    # property of the supplied set as a set and never of the order
+    # an operator named its files in. Each distinct base, and each
+    # stated value below, orders by the earliest record under this
+    # rule that identifies the base or states the value; ties keep
+    # the order the statements stand in their record.
+    record_pairs = []
+    for _n, _h, _b, source, kind in facts.base_ids:
+        record_pairs.append((source, kind))
+    for _v, source, kind in facts.called_versions:
+        record_pairs.append((source, kind))
+    for _v, source, kind in facts.called_hashes:
+        record_pairs.append((source, kind))
+
+    def _pair_compare(left_pair, right_pair):
+        left_rank = _record_group_rank(left_pair[1])
+        right_rank = _record_group_rank(right_pair[1])
+        if left_rank != right_rank:
+            return -1 if left_rank < right_rank else 1
+        by_path = _path_compare(left_pair[0], right_pair[0])
+        if by_path:
+            return by_path
+        if left_pair[1] == right_pair[1]:
+            return 0
+        return -1 if left_pair[1] < right_pair[1] else 1
+
+    ordered_pairs = sorted(
+        set(record_pairs), key=functools.cmp_to_key(_pair_compare))
+    record_order = {pair: index
+                    for index, pair in enumerate(ordered_pairs)}
+
+    def _earliest_record(entries):
+        return min(record_order[(source, kind)]
+                   for source, kind in entries)
+
+    distinct_bases.sort(key=lambda entry: _earliest_record(
+        (source, kind) for (n, h, b, source, kind)
+        in facts.base_ids if (n, h, b) == entry))
     base_disagreement = len(driving_bases) > 1
     pinned = None
     if len(distinct_bases) == 1:
@@ -1851,6 +2062,20 @@ def compute(files, table_data, catalogue_data, table_hash, params):
     for value, _source, kind in facts.called_hashes:
         if kind in driving and value not in driving_hashes:
             driving_hashes.append(value)
+    called_versions.sort(key=lambda value: _earliest_record(
+        (source, kind) for (v, source, kind)
+        in facts.called_versions if v == value))
+    called_hashes.sort(key=lambda value: _earliest_record(
+        (source, kind) for (v, source, kind)
+        in facts.called_hashes if v == value))
+    driving_versions.sort(key=lambda value: _earliest_record(
+        (source, kind) for (v, source, kind)
+        in facts.called_versions
+        if v == value and kind in driving))
+    driving_hashes.sort(key=lambda value: _earliest_record(
+        (source, kind) for (v, source, kind)
+        in facts.called_hashes
+        if v == value and kind in driving))
     if len(driving_versions) > 1 or len(driving_hashes) > 1:
         identity_bad = True
     elif driving_versions and driving_versions[0] != table.version:
@@ -1874,6 +2099,14 @@ def compute(files, table_data, catalogue_data, table_hash, params):
         for value, source, _k in facts.called_hashes:
             if source in sources and value not in hashes:
                 hashes.append(value)
+        versions.sort(key=lambda value: _earliest_record(
+            (source, kind) for (v, source, kind)
+            in facts.called_versions
+            if v == value and source in sources))
+        hashes.sort(key=lambda value: _earliest_record(
+            (source, kind) for (v, source, kind)
+            in facts.called_hashes
+            if v == value and source in sources))
         called_by_base.append({"name": entry[0],
                                "versions": versions,
                                "hashes": hashes})

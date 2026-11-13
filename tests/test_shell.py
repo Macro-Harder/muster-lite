@@ -560,3 +560,72 @@ class TestStep15Round1FixesShell(ShellStaging):
         self.assertNotIn("roster.md", agentic["inputs_read"])
         self.assertIn("roster.md", agentic["inputs_unread"])
         self.assertNotIn("this run read roster.md", res.stdout)
+
+
+class TestStep15Round2FixesShell(ShellStaging):
+    """Step 15 round 2 fix round tests: dual role classification
+    and spawn export classification."""
+
+    def test_roster_named_supplied_and_base_record_stays_supplied(self):
+        # Step 15 round 2, NB-4 and C2-F6: a roster named both as a
+        # supplied file and as a base record does not drop out of
+        # the supplied set. Its standing is stated in the report
+        # without contradiction: the run passes on it, and no line
+        # states that no roster artifact stood in the supplied set.
+        self.require_product()
+        root = self.stage_dir()
+        roster = self.write_file(root, "roster.md", staffed())
+        namings = (
+            ["--base-record", str(roster)],
+            ["--base-record", str(roster), "--context", str(roster)],
+        )
+        for extra in namings:
+            with self.subTest(extra=extra):
+                res = self.invoke(
+                    [str(roster)] + extra +
+                    ["--stage", "Step 99", "--runner", "Fixture Auditor",
+                     "--capacity", "Auditor"])
+                self.assert_rollup(res, "PASS", 0)
+                self.assertIn("roster.md",
+                              self.agentic(res)["inputs_read"])
+                self.assertNotIn("no roster artifact in the supplied "
+                                 "set", res.stdout)
+
+    def spawn_export_text(self, claim=False):
+        # A file in the spawn export form, a JSON object carrying a
+        # spawns key, whose string value carries a roster heading
+        # line on its own line inside the string, and, in the claim
+        # staging, one claim line inside the same string.
+        note = "intro\n## Team: Audit team\n"
+        if claim:
+            note += "Freshness claim: family 3 held for this stage.\n"
+        note += "outro"
+        return '{\n  "spawns": [\n    {"note": "%s"}\n  ]\n}\n' % note
+
+    def test_spawn_export_with_heading_in_string_is_ignored(self):
+        # Step 15 round 2, NB-5: a spawn export is classified by its
+        # export form, not by roster shaped strings inside its
+        # values. Alone it is ignored and the run cannot start;
+        # beside a passing roster it stands under ignored inputs and
+        # never under inputs read; and a claim line inside its
+        # string does not cap the rollup.
+        self.require_product()
+        root = self.stage_dir()
+        export = self.write_file(root, "export.json",
+                                 self.spawn_export_text())
+        res = self.invoke_paths([export])
+        self.assertEqual(res.returncode, 4)
+        self.assertIn("Cannot start", res.stderr)
+        roster = self.write_file(root, "roster.md", staffed())
+        res = self.invoke_paths([roster, export])
+        self.assert_rollup(res, "PASS", 0)
+        agentic = self.agentic(res)
+        self.assertIn("export.json", agentic["inputs_ignored"])
+        self.assertNotIn("export.json", agentic["inputs_read"])
+        claim_export = self.write_file(
+            root, "export-claim.json", self.spawn_export_text(True))
+        res = self.invoke_paths([roster, claim_export])
+        self.assert_rollup(res, "PASS", 0)
+        agentic = self.agentic(res)
+        self.assertIn("export-claim.json", agentic["inputs_ignored"])
+        self.assertNotIn("export-claim.json", agentic["inputs_read"])

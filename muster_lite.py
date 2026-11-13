@@ -23,6 +23,34 @@ import muster_shell
 USAGE_OPTIONS = ("--stage", "--runner", "--capacity", "--context",
                  "--base-record", "--kind", "--fixture-fault")
 
+# Every character a line reader splits text on: newline, carriage
+# return, U+2028, U+2029, U+000B, U+000C, and U+0085. A printed value
+# carrying any of them could write a line of its own into an output,
+# so each one prints as a space in every printed value, on every
+# output path.
+LINE_BREAK_CHARS = tuple(
+    chr(code) for code in (0x0A, 0x0D, 0x2028, 0x2029, 0x0B, 0x0C,
+                           0x85))
+
+
+def _printed_value(value):
+    """A value with every line break character printed as a space."""
+    for break_char in LINE_BREAK_CHARS:
+        value = value.replace(break_char, " ")
+    return value
+
+
+def _report_text(text):
+    """Report text with every line break character that a value
+    could carry printed as a space. The newline character stands:
+    it is the line break the report forms themselves are built
+    from, and no value reaches it unsanitised."""
+    for break_char in LINE_BREAK_CHARS:
+        if break_char == "\n":
+            continue
+        text = text.replace(break_char, " ")
+    return text
+
 
 class UsageError(Exception):
     pass
@@ -62,10 +90,10 @@ def parse_arguments(argv):
             index += 2
             if arg in ("--stage", "--runner", "--capacity"):
                 # These values are printed into the fixed report
-                # lines, so a line break inside one is printed as a
-                # space: a value can never write a line of its own
-                # into a report.
-                value = value.replace("\r", " ").replace("\n", " ")
+                # lines, so every line break character inside one is
+                # printed as a space: a value can never write a line
+                # of its own into a report.
+                value = _printed_value(value)
             if arg == "--stage":
                 parsed["stage"] = value
             elif arg == "--runner":
@@ -695,7 +723,11 @@ def run(argv):
     try:
         parsed = parse_arguments(argv)
     except UsageError as exc:
-        sys.stdout.write("USAGE ERROR: %s\n" % exc)
+        # The usage error output echoes invocation text, so it is
+        # sanitised on the same rule as the report forms: no line
+        # break character in an echoed argument or value can write
+        # a line of its own into this output either.
+        sys.stdout.write("USAGE ERROR: %s\n" % _printed_value(str(exc)))
         return 5
     entry_dir = os.path.dirname(os.path.abspath(__file__))
     named = [(path, "supplied") for path in parsed["files"]]
@@ -735,7 +767,8 @@ def run(argv):
               "run_kind": parsed["kind"]}
     result = muster_core.compute(files, table_data, catalogue_data,
                                  table_hash, params)
-    text = simple_form(result) + advanced_form(result) + \
+    text = _report_text(simple_form(result)) + \
+        _report_text(advanced_form(result)) + \
         serialise(agentic_object(result)) + "\n"
     sys.stdout.write(text)
     sys.stdout.flush()

@@ -657,3 +657,330 @@ class TestStep15Round1FixesData(MusterCase):
             counts = {c["name"]: c
                       for c in self.agentic(res)["counts"]}
             self.assertEqual(counts["Audit team"]["minimum"], 3)
+
+
+class TestStep15Round2FixesData(MusterCase):
+    """Step 15 round 2 fix round tests: placeholder phrases, data
+    file validation completeness, and disagreement form order."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def test_placeholder_phrases_never_count(self):
+        # Step 15 round 2, NB-1 and C2-F1: a placeholder stated as a
+        # phrase of more than one word, or carrying ordinary sentence
+        # punctuation, spacing, or repetition, never counts as a full
+        # identifier. The brief at Section 5.3 governs: a placeholder
+        # is not a full identifier, judged on the whole value.
+        phrases = (
+            # NB-1 phrases.
+            "To be decided", "Pending approval", "Not yet assigned",
+            "To be announced", "No holder", "No one", "Someone TBD",
+            "TBD Smith", "T B D", "TBD TBD", "Unknown Person",
+            "Vacant seat", "Awaiting someone", "Pending review",
+            "To be confirmed later", "Not assigned yet", "Holder TBD",
+            "TBD [pending]",
+            # C2-F1 punctuation and spacing variants of charged
+            # phrases.
+            "to be determined.", "to be confirmed.",
+            "to be assigned.", "awaiting assignment.",
+            "awaiting  assignment", "awaiting assignment,",
+            "pending assignment", "assignment pending.",
+        )
+        for value in phrases:
+            with self.subTest(value=value):
+                res, _ = self.run_stage(
+                    {"roster.md": self.roster_with_holder(value)})
+                self.assert_report_present(res)
+                self.assertNotEqual(rollup_of(res), "PASS")
+                counts = {c["name"]: c
+                          for c in self.agentic(res)["counts"]}
+                self.assertLess(counts["Audit team"]["counted_total"],
+                                3)
+
+    def test_full_placeholder_rosters_do_not_pass(self):
+        # Step 15 round 2, NB-1: rosters whose three team seats are
+        # held by placeholder phrases alone name nobody and do not
+        # pass.
+        rosters = (
+            ("To be decided", "Pending approval", "Not yet assigned"),
+            ("TBD TBD", "TBC TBC", "Unknown Unknown"),
+            ("T B D", "T B C", "No one"),
+        )
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        for holders in rosters:
+            with self.subTest(holders=holders):
+                text = roster_text(
+                    teams=[("Audit team", None,
+                            [(role, holder, "counted in base")
+                             for role, holder in zip(roles, holders)])],
+                    board=self.BOARD)
+                res, _ = self.run_stage({"roster.md": text})
+                self.assert_report_present(res)
+                self.assertNotEqual(rollup_of(res), "PASS")
+                counts = {c["name"]: c
+                          for c in self.agentic(res)["counts"]}
+                self.assertEqual(
+                    counts["Audit team"]["counted_total"], 0)
+
+    def test_names_containing_placeholder_words_count(self):
+        # Step 15 round 2, NB-7: a complete name of more than one
+        # word that merely contains a placeholder word as one word
+        # of the name stands on its own form and counts. The rule
+        # judges the whole value, not a substring of it.
+        for value in ("Placeholder Smith", "Fragment Jones",
+                      "Pending Sutton", "Vacant Lotus", "John Pending",
+                      "Fixture Name One", "Todd Bridges"):
+            with self.subTest(value=value):
+                res, _ = self.run_stage(
+                    {"roster.md": self.roster_with_holder(value)})
+                self.assert_rollup(res, "PASS", 0)
+                counts = {c["name"]: c
+                          for c in self.agentic(res)["counts"]}
+                self.assertEqual(counts["Audit team"]["counted_total"],
+                                 3)
+
+    def staged_table_run(self, table, name="counting-table.json"):
+        import tempfile
+        from pathlib import Path
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        fixture = Path(tmp.name) / "table-variant.json"
+        fixture.write_text(json.dumps(table), encoding="utf-8")
+        return TestCountingTableAsData.run_with_data_file(
+            self, name, fixture)
+
+    def test_counting_table_validation_covers_every_part(self):
+        # Step 15 round 2, NB-3 and C2-F2: the counting table
+        # validation covers every part the counting reads. A table
+        # missing or mistyping any of them takes the tool fault
+        # outcome at exit 6, in the shipped form and in the rows
+        # form alike.
+        shipped = json.loads(
+            self.require_data_file("counting-table.json").read_text(
+                encoding="utf-8"))
+        variants = {}
+        no_rows = dict(shipped)
+        del no_rows["per_step_rows"]
+        variants["per_step_rows deleted"] = no_rows
+        no_totals = dict(shipped)
+        del no_totals["step_totals"]
+        variants["step_totals deleted"] = no_totals
+        no_keyed = dict(shipped)
+        del no_keyed["keyed_base"]
+        variants["keyed_base deleted"] = no_keyed
+        nb1 = dict(shipped)
+        del nb1["per_step_rows"]
+        nb1["team_bases"] = {}
+        variants["per_step_rows deleted, empty team_bases"] = nb1
+        nb2 = json.loads(json.dumps(shipped))
+        nb2["per_step_rows"] = []
+        nb2["team_bases"] = {}
+        variants["empty per_step_rows, empty team_bases"] = nb2
+        variants["rows form row with no minimum"] = {
+            "table_version": "1.0.0-fixture",
+            "keyed_base": shipped["keyed_base"],
+            "rows": [{"step": 99, "team": "Audit team"}]}
+        nb4 = json.loads(json.dumps(shipped))
+        del nb4["per_step_rows"][0]["minimum"]
+        nb4["team_bases"] = None
+        variants["shipped row with no minimum, null team_bases"] = nb4
+        for label, table in variants.items():
+            with self.subTest(variant=label):
+                res = self.staged_table_run(table)
+                self.assertEqual(res.returncode, 6)
+                self.assert_in_stdout(res, "TOOL FAULT")
+                self.assertIsNone(rollup_of(res))
+
+    def test_rows_form_table_with_minimums_still_governs(self):
+        # Step 15 round 2 control for NB-3: a table in the minimal
+        # rows form, its rows carrying their minimums, stands in its
+        # own form and governs the run as before.
+        res = TestCountingTableAsData.run_with_data_file(
+            self, "counting-table.json", DATA / "table-lf.json")
+        self.assert_rollup(res, "PASS", 0)
+
+    def test_gutted_diagnostic_catalogue_takes_tool_fault(self):
+        # Step 15 round 2, NB-6 and C2-F4: the diagnostic catalogue
+        # stands validated on the same brief Section 6 footing as
+        # the counting table. An empty object, a missing or numeric
+        # version, or rows of the wrong type fault the same way.
+        shipped = json.loads(
+            self.require_data_file(
+                "diagnostic-catalogue.json").read_text(
+                encoding="utf-8"))
+        variants = {}
+        variants["empty object"] = {}
+        no_version = dict(shipped)
+        del no_version["catalogue_version"]
+        variants["version missing"] = no_version
+        numeric = dict(shipped)
+        numeric["catalogue_version"] = 100
+        variants["version numeric"] = numeric
+        word_rows = dict(shipped)
+        word_rows["rows"] = "word"
+        variants["rows as a word"] = word_rows
+        for label, catalogue in variants.items():
+            with self.subTest(variant=label):
+                res = self.staged_table_run(
+                    catalogue, name="diagnostic-catalogue.json")
+                self.assertEqual(res.returncode, 6)
+                self.assert_in_stdout(res, "TOOL FAULT")
+                self.assertIsNone(rollup_of(res))
+
+    def test_identification_sentences_follow_manifest_order(self):
+        # Step 15 round 2, C2-F3: Identification sentences print in
+        # the canonical manifest order of the records that identify
+        # each base, so the same set named in any order gives a byte
+        # identical report.
+        one = ("# Tier record\n\n"
+               "Pinned base: Fixture Base One, hash %s, 12345 bytes.\n"
+               "Table version the base calls for: 1.0.0-fixture.\n"
+               % ("0123456789abcdef" * 4))
+        two = ("# Tier record\n\n"
+               "Pinned base: Fixture Base Two, hash %s, 999 bytes.\n"
+               "Table version the base calls for: 1.0.0-fixture.\n"
+               % ("fedcba9876543210" * 4))
+        first, _ = self.run_stage({"roster.md": simple_roster(),
+                                   "aaa-tier.md": one,
+                                   "zzz-tier.md": two})
+        second, _ = self.run_stage({"roster.md": simple_roster(),
+                                    "zzz-tier.md": two,
+                                    "aaa-tier.md": one})
+        for res in (first, second):
+            self.assert_rollup(res, "UNVERIFIABLE", 3)
+            one_at = res.stdout.find(
+                "Identification: Fixture Base One")
+            two_at = res.stdout.find(
+                "Identification: Fixture Base Two")
+            self.assertTrue(0 <= one_at < two_at)
+        self.assertEqual(first.stdout, second.stdout)
+
+    def test_stated_value_sentences_follow_manifest_order(self):
+        # Step 15 round 2, C2-F3: Stated value sentences in the
+        # called for disagreement form print in the canonical
+        # manifest order of the records that state them, so the same
+        # set named in any order gives a byte identical report.
+        aaa = ("# Tier record\n\n"
+               "Pinned base: Fixture Base One, hash %s, 12345 bytes.\n"
+               "Table version the base calls for: 2.0.0-aaa.\n"
+               % ("0123456789abcdef" * 4))
+        zzz = ("# Tier record\n\n"
+               "Pinned base: Fixture Base One, hash %s, 12345 bytes.\n"
+               "Table version the base calls for: 3.0.0-zzz.\n"
+               % ("0123456789abcdef" * 4))
+        first, _ = self.run_stage({"roster.md": simple_roster(),
+                                   "aaa-tier.md": aaa,
+                                   "zzz-tier.md": zzz})
+        second, _ = self.run_stage({"roster.md": simple_roster(),
+                                    "zzz-tier.md": zzz,
+                                    "aaa-tier.md": aaa})
+        for res in (first, second):
+            self.assert_rollup(res, "UNVERIFIABLE", 3)
+            aaa_at = res.stdout.find("Stated value: 2.0.0-aaa.")
+            zzz_at = res.stdout.find("Stated value: 3.0.0-zzz.")
+            self.assertTrue(0 <= aaa_at < zzz_at)
+        self.assertEqual(first.stdout, second.stdout)
+
+
+class TestStep15Round2PrinciplesCureData(MusterCase):
+    """Step 15 round 2 principles cure tests: the probed and widened
+    placeholder forms pinned in the suite, and the closed phrase
+    rule for complete names built from former vocabulary words.
+
+    The pinning tests in this class stand written after the Family 1
+    widening they pin. They are a cure act for a test first breach,
+    and no record presents them as having preceded the widening.
+    The Chosen One class test and the removed words test in this
+    class stand written before the product change that cures them,
+    in test first form for that change.
+    """
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def assert_holder_counts(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def test_probed_variants_never_count(self):
+        # Every probed form the round 2 fix register Family 1 entry
+        # records: the six forms that refused on probing, and the
+        # three forms that still counted and prompted the widening.
+        for value in ("Awaiting confirmation", "Decision pending",
+                      "Unassigned seat", "Seat vacant",
+                      "To be appointed", "Assignee unknown",
+                      "Pending appointment", "Not yet known",
+                      "To be filled"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_nine_widened_words_in_recorded_phrase_forms_never_count(self):
+        # One recorded phrase form for each of the nine widened
+        # words: appointment, appointee, designated, designation,
+        # known, filled, fill, selected, and chosen.
+        for value in ("Pending appointment", "Unknown appointee",
+                      "To be designated", "Designation pending",
+                      "Not yet known", "To be filled", "Seat to fill",
+                      "To be selected", "To be chosen"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_added_closed_phrases_never_count(self):
+        # Phrases added to the closed phrase set by the principles
+        # cure act itself, each a placeholder statement in its own
+        # form, pinned here before the phrase set carried them.
+        for value in ("Determination pending", "Name unknown",
+                      "Still pending", "Unfilled seat",
+                      "Unnamed holder"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_chosen_one_class_counts(self):
+        # A complete name in the form of a widened word followed by
+        # the word One, whose whole value stands in no placeholder
+        # phrase, counts on its own form under the brief Section
+        # 5.3 definition, as Placeholder Smith and Fragment Jones
+        # count. Chosen One is the named member of the class.
+        for value in ("Chosen One", "Selected One", "Known One",
+                      "Designated One"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_removed_vocabulary_words_no_longer_refuse_on_their_own(self):
+        # The six former vocabulary words removed as free standing
+        # words by the cure (an, anybody, anyone, nobody, somebody,
+        # and the) no longer refuse a complete name built with the
+        # word One, a form that stands in no placeholder phrase.
+        for value in ("The One", "An One", "Anybody One",
+                      "Anyone One", "Somebody One", "Nobody One"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)

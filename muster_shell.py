@@ -27,10 +27,15 @@ class CapturedFile(object):
         self.group = group
         self.groups = {group}
         # The display name is printed into the fixed report lines, so
-        # a line break inside a file name is printed as a space: a
-        # name can never write a line of its own into a report.
-        self.display = os.path.basename(named_path).replace(
-            "\r", " ").replace("\n", " ")
+        # every line break character inside a file name is printed as
+        # a space: a name can never write a line of its own into a
+        # report. The line break characters are newline, carriage
+        # return, U+2028, U+2029, U+000B, U+000C, and U+0085, every
+        # character a line reader splits text on.
+        self.display = os.path.basename(named_path)
+        for break_char in ("\n", "\r", "\u2028", "\u2029",
+                           "\u000b", "\u000c", "\u0085"):
+            self.display = self.display.replace(break_char, " ")
         self.identity = None
         self.raw = None
         self.text = None
@@ -172,90 +177,178 @@ def _is_int(value):
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def _validate_keyed_base(keyed):
+    """A keyed base that stands must stand in its whole form."""
+    if not isinstance(keyed, dict):
+        raise DataFault("counting table keyed base is not an object")
+    for field in ("name", "hash"):
+        if not isinstance(keyed.get(field), str) or not keyed[field]:
+            raise DataFault("counting table keyed base %s is not a "
+                            "string" % field)
+    if not _is_int(keyed.get("bytes")):
+        raise DataFault("counting table keyed base bytes is not a "
+                        "number")
+
+
+def _validate_team_bases(bases):
+    """Team bases that stand must stand whole and typed."""
+    if not isinstance(bases, dict) or not bases:
+        raise DataFault("counting table team bases is not a non "
+                        "empty object")
+    for team, tiers in bases.items():
+        if not isinstance(tiers, dict) or not tiers:
+            raise DataFault("counting table base for %s is not a "
+                            "non empty object" % team)
+        for tier, value in tiers.items():
+            if _is_int(value):
+                continue
+            if isinstance(value, dict) and all(
+                    _is_int(value.get(end))
+                    for end in ("minimum", "maximum")):
+                continue
+            raise DataFault(
+                "counting table base for %s at %s is not a count "
+                "or a band" % (team, tier))
+
+
+def _validate_table_rows(rows, rows_key):
+    """Every row, in every rows form, carries its whole form.
+
+    The counting reads the minimum inside every row, so a row with
+    no minimum, no step, or no team is damage in the shipped form
+    and in the minimal rows form alike, and an empty rows list
+    carries no rule at all.
+    """
+    if not isinstance(rows, list) or not rows:
+        raise DataFault("counting table %s is not a non empty list"
+                        % rows_key)
+    for row in rows:
+        if not isinstance(row, dict):
+            raise DataFault("counting table row is not an object")
+        if not _is_int(row.get("step")):
+            raise DataFault("counting table row step is not a "
+                            "number")
+        if not isinstance(row.get("team"), str) or not row["team"]:
+            raise DataFault("counting table row team is not a "
+                            "string")
+        if not _is_int(row.get("minimum")):
+            raise DataFault("counting table row carries no minimum "
+                            "as a number")
+
+
+def _validate_table_totals(totals, totals_key, non_empty):
+    if not isinstance(totals, dict):
+        raise DataFault("counting table %s is not an object of "
+                        "counts" % totals_key)
+    if non_empty and not totals:
+        raise DataFault("counting table %s stands empty"
+                        % totals_key)
+    for key, value in totals.items():
+        try:
+            int(key)
+        except (TypeError, ValueError):
+            raise DataFault("counting table %s key is not a number"
+                            % totals_key)
+        if not _is_int(value):
+            raise DataFault("counting table %s is not an object of "
+                            "counts" % totals_key)
+
+
+_SHIPPED_TABLE_PARTS = ("team_bases", "per_step_rows", "step_totals",
+                        "keyed_base", "board_additions",
+                        "counting_positions", "carried_seats",
+                        "exempt_list", "pool_families")
+
+
 def _validate_counting_table(data):
     """Refuse a counting table whose rule data is missing or mistyped.
 
     A table that parses as a JSON object but carries no rules, or
     carries a rule value of the wrong kind, is a damaged shipped
     file, not a table with no rules: it takes the tool fault outcome
-    through DataFault, as a shipped file that cannot be used. Keys
-    the table form does not require may stand absent; a key that
-    stands must carry its stated kind.
+    through DataFault, as a shipped file that cannot be used. The
+    validation covers every part the counting reads: team_bases,
+    per_step_rows, step_totals, keyed_base, and the minimum inside
+    every row, in every rows form the shipped table and the suite
+    use. A part that stands in either form must stand whole and
+    typed, a part present as a null value is mistyped and faults,
+    and damage by absence inside a standing shape faults the same
+    way. Keys the table form does not name may stand in the table
+    and govern nothing.
+
+    A table standing in the shipped form, which is any table
+    carrying a shipped form part, must stand complete in that
+    form: every shipped part present, its rows and bases non
+    empty. A table in the minimal rows form, carrying rows and no
+    shipped form part, stands in its own form and is not refused
+    for lacking parts of the other form.
     """
     version = data.get("table_version")
     if not isinstance(version, str) or not version:
         raise DataFault("counting table carries no table version")
-    if "per_step_rows" in data:
-        # A table in the shipped six part form stands complete or
-        # not at all: a part deleted from that form is damage, and
-        # the table takes the tool fault outcome. A table in the
-        # minimal rows form carries no such parts and stands in its
-        # own form.
-        for part in ("team_bases", "counting_positions",
-                     "carried_seats", "exempt_list", "pool_families"):
+    shipped_form = any(
+        part in data for part in _SHIPPED_TABLE_PARTS
+        if part != "keyed_base")
+    if shipped_form:
+        for part in _SHIPPED_TABLE_PARTS:
             if part not in data:
                 raise DataFault("counting table in the shipped form "
                                 "is missing its %s part" % part)
-    keyed = data.get("keyed_base")
-    if keyed is not None:
-        if not isinstance(keyed, dict):
-            raise DataFault("counting table keyed base is not an "
+        _validate_team_bases(data["team_bases"])
+        _validate_table_rows(data["per_step_rows"], "per_step_rows")
+        _validate_keyed_base(data["keyed_base"])
+        _validate_table_totals(data["step_totals"], "step_totals",
+                               non_empty=True)
+        _validate_table_totals(data["board_additions"],
+                               "board_additions", non_empty=True)
+        for list_key in ("counting_positions", "carried_seats",
+                         "exempt_list", "pool_families"):
+            if not isinstance(data[list_key], list):
+                raise DataFault("counting table %s is not a list"
+                                % list_key)
+        if "rows" in data:
+            _validate_table_rows(data["rows"], "rows")
+    else:
+        if "rows" not in data:
+            raise DataFault("counting table carries no rows in any "
+                            "form the table ships in")
+        _validate_table_rows(data["rows"], "rows")
+        if "keyed_base" in data:
+            _validate_keyed_base(data["keyed_base"])
+        if "team_bases" in data:
+            _validate_team_bases(data["team_bases"])
+        for totals_key in ("step_totals", "board_additions"):
+            if totals_key in data:
+                _validate_table_totals(data[totals_key], totals_key,
+                                       non_empty=False)
+
+
+def _validate_diagnostic_catalogue(data):
+    """Refuse a diagnostic catalogue that cannot stand as shipped.
+
+    The catalogue stands on the same brief Section 6 footing as
+    the counting table: it ships as a version and its rows, and a
+    catalogue carrying no version, a version of the wrong kind, or
+    rows of the wrong kind is a damaged shipped file and takes the
+    tool fault outcome through DataFault. Catalogue rows drive no
+    check, so this validation changes no verdict on a catalogue
+    that stands whole.
+    """
+    version = data.get("catalogue_version")
+    if not isinstance(version, str) or not version:
+        raise DataFault("diagnostic catalogue carries no catalogue "
+                        "version")
+    rows = data.get("rows")
+    if not isinstance(rows, list) or not rows:
+        raise DataFault("diagnostic catalogue rows is not a non "
+                        "empty list")
+    for row in rows:
+        if not isinstance(row, dict):
+            raise DataFault("diagnostic catalogue row is not an "
                             "object")
-        for field in ("name", "hash"):
-            if field in keyed and not isinstance(keyed[field], str):
-                raise DataFault("counting table keyed base %s is not "
-                                "a string" % field)
-        if "bytes" in keyed and not _is_int(keyed["bytes"]):
-            raise DataFault("counting table keyed base bytes is not "
-                            "a number")
-    bases = data.get("team_bases")
-    if bases is not None:
-        if not isinstance(bases, dict):
-            raise DataFault("counting table team bases is not an "
-                            "object")
-        for team, tiers in bases.items():
-            if not isinstance(tiers, dict):
-                raise DataFault("counting table base for %s is not "
-                                "an object" % team)
-            for tier, value in tiers.items():
-                if _is_int(value):
-                    continue
-                if isinstance(value, dict) and all(
-                        _is_int(value.get(end))
-                        for end in ("minimum", "maximum")):
-                    continue
-                raise DataFault(
-                    "counting table base for %s at %s is not a count "
-                    "or a band" % (team, tier))
-    for rows_key in ("per_step_rows", "rows"):
-        rows = data.get(rows_key)
-        if rows is None:
-            continue
-        if not isinstance(rows, list):
-            raise DataFault("counting table %s is not a list"
-                            % rows_key)
-        for row in rows:
-            if not isinstance(row, dict):
-                raise DataFault("counting table row is not an object")
-            if "minimum" in row and not _is_int(row["minimum"]):
-                raise DataFault("counting table row minimum is not "
-                                "a number")
-            if "step" in row and not _is_int(row["step"]):
-                raise DataFault("counting table row step is not a "
-                                "number")
-    for totals_key in ("step_totals", "board_additions"):
-        totals = data.get(totals_key)
-        if totals is None:
-            continue
-        if not isinstance(totals, dict) or not all(
-                _is_int(value) for value in totals.values()):
-            raise DataFault("counting table %s is not an object of "
-                            "counts" % totals_key)
-    for list_key in ("counting_positions", "carried_seats",
-                     "exempt_list", "pool_families"):
-        if list_key in data and not isinstance(data[list_key], list):
-            raise DataFault("counting table %s is not a list"
-                            % list_key)
+        if not isinstance(row.get("code"), str) or not row["code"]:
+            raise DataFault("diagnostic catalogue row carries no "
+                            "code as a string")
 
 
 def load_data_file(entry_dir, name):
@@ -285,4 +378,6 @@ def load_data_file(entry_dir, name):
         raise DataFault("shipped data file is not a JSON object")
     if name == "counting-table.json":
         _validate_counting_table(data)
+    if name == "diagnostic-catalogue.json":
+        _validate_diagnostic_catalogue(data)
     return data, raw, hashlib.sha256(raw).hexdigest()
