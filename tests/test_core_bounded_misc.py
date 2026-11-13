@@ -231,3 +231,26 @@ class TestDiagnosticCatalogueAsData(MusterCase):
             .read_text(encoding="utf-8"))
         self.assertIn("scoped", record["duty"])
         self.require_product()
+
+
+class TestStep15Round1LongToken(MusterCase):
+    """Step 15 round 1 fix round test: one long unbroken token."""
+
+    def test_long_unbroken_token_completes_inside_a_generous_bound(self):
+        # Step 15 round 1, BR-2: a single unbroken token of 20,000
+        # characters, in a roster comment line and in a note file
+        # beside the roster, does not hang the run: the run completes
+        # inside a generous bound of 25 seconds on each staging.
+        import time
+        token = "A" * 20000
+        stagings = (
+            stage_files(extra_lines=["# " + token]),
+            stage_files(extra_files={"note.md": "# Note\n\n" + token
+                                     + "\n"}),
+        )
+        for files in stagings:
+            started = time.time()
+            res, _ = self.run_stage(files)
+            elapsed = time.time() - started
+            self.assertLess(elapsed, 25)
+            self.assert_rollup(res, "PASS", 0)

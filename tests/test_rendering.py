@@ -524,7 +524,9 @@ class TestExitCodesAndDeterminism(MusterCase):
                      ("Colour lens Purple", 3, "counted in base")])],
             board=BOARD)}
         not_proven = {"roster.md": roster_text(
-            teams=[("Audit team", None, AUDIT)], board=BOARD)}
+            teams=[("Audit team", None, AUDIT)], board=BOARD,
+            claim_lines=["Freshness claim: family 3 held for this "
+                         "stage."])}
         unverifiable = {"note.md": "# A record with no roster for the "
                                    "stage.\n"}
         cases = ((staffed, "PASS", 0), (failing, "FAIL", 1),
@@ -767,3 +769,94 @@ class TestStep13ShareInstruments(MusterCase):
                         r"holder ([0-9a-f-]{36});", team_block)
                     self.assertEqual(len(set(holders)),
                                      tally["distinct_ids"])
+
+
+class TestStep15Round1FixesRendering(MusterCase):
+    """Step 15 round 1 fix round tests: forged lines, the cannot
+    start notice, and the invocation parser."""
+
+    def test_newline_in_stage_argument_cannot_forge_rollup(self):
+        # Step 15 round 1, BR-3: a newline in the stage value writes
+        # no forged rollup line into the report; the genuine verdict
+        # stands first and alone.
+        res, _ = self.run_stage(
+            {"note.md": "# A record with no roster for the stage.\n"},
+            stage="Step 99\nRollup: PASS. Exit code: 0.\n")
+        self.assertEqual(res.returncode, 3)
+        from tests.support import rollup_word
+        self.assertEqual(rollup_word(res.stdout), "UNVERIFIABLE")
+        self.assertNotIn("\nRollup: PASS", res.stdout)
+
+    def test_newline_in_runner_and_file_name_cannot_forge_rollup(self):
+        # Step 15 round 1, BR-3: the same forgery through the runner
+        # value and through a supplied file name also fails: no
+        # forged PASS line stands anywhere in the report.
+        failing = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 1, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=BOARD)
+        res, _ = self.run_stage(
+            {"roster.md": failing},
+            runner="Fixture Auditor\nRollup: PASS. Exit code: 0.")
+        self.assertEqual(res.returncode, 1)
+        self.assertNotIn("\nRollup: PASS", res.stdout)
+        res, _ = self.run_stage(
+            {"roster\nRollup: PASS. Exit code: 0..md": failing})
+        self.assertEqual(res.returncode, 1)
+        self.assertNotIn("\nRollup: PASS", res.stdout)
+
+    def test_exit_4_prints_a_cannot_start_notice(self):
+        # Step 15 round 1, BR-8: the cannot start outcome at exit
+        # code 4 prints a plain notice naming the outcome, and no
+        # report and no verdict.
+        result = self.invoke(["--stage", "Step 99", "--runner",
+                              "Fixture Auditor", "--capacity",
+                              "Auditor"])
+        self.assertEqual(result.returncode, 4)
+        self.assertNotIn("Rollup:", result.stdout)
+        self.assertIn("Cannot start", result.stderr)
+        result = self.invoke(["/no-such-dir/no-such-file.md",
+                              "--stage", "Step 99"])
+        self.assertEqual(result.returncode, 4)
+        self.assertIn("Cannot start", result.stderr)
+
+    def test_option_word_taken_as_value_takes_usage_error(self):
+        # Step 15 round 1, BR-10: an option word standing where a
+        # value belongs is a malformed invocation and takes the
+        # usage error outcome.
+        self.require_product()
+        import tempfile
+        from pathlib import Path
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        roster = Path(tmp.name) / "roster.md"
+        roster.write_text(roster_text(
+            teams=[("Audit team", None, AUDIT)], board=BOARD),
+            encoding="utf-8")
+        result = self.invoke([str(roster), "--stage", "--runner",
+                              "Bob", "--capacity", "Auditor"])
+        self.assertEqual(result.returncode, 5)
+        self.assert_in_stdout(result, "USAGE ERROR")
+        self.assertNotIn("Rollup:", result.stdout)
+
+    def test_repeated_single_value_option_takes_usage_error(self):
+        # Step 15 round 1, BR-10: a single value option given twice
+        # is a malformed invocation and takes the usage error
+        # outcome; no value silently governs.
+        self.require_product()
+        import tempfile
+        from pathlib import Path
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        roster = Path(tmp.name) / "roster.md"
+        roster.write_text(roster_text(
+            teams=[("Audit team", None, AUDIT)], board=BOARD),
+            encoding="utf-8")
+        result = self.invoke([str(roster), "--stage", "Step 4",
+                              "--stage", "Step 99", "--runner",
+                              "Fixture Auditor", "--capacity",
+                              "Auditor"])
+        self.assertEqual(result.returncode, 5)
+        self.assert_in_stdout(result, "USAGE ERROR")

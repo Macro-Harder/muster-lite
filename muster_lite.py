@@ -38,6 +38,7 @@ def parse_arguments(argv):
     parsed = {"files": [], "context": [], "base_record": [],
               "stage": None, "runner": None, "capacity": None,
               "kind": "gate run", "fixture_fault": None}
+    single_value_seen = set()
     index = 0
     while index < len(argv):
         arg = argv[index]
@@ -47,7 +48,24 @@ def parse_arguments(argv):
             if index + 1 >= len(argv):
                 raise UsageError("option needs a value: %s" % arg)
             value = argv[index + 1]
+            if value.startswith("--"):
+                # An option word standing where a value belongs is a
+                # malformed invocation, never a value.
+                raise UsageError("option needs a value: %s" % arg)
+            if arg not in ("--context", "--base-record"):
+                # A single value option given twice is a malformed
+                # invocation: no value silently governs over another.
+                if arg in single_value_seen:
+                    raise UsageError(
+                        "option given more than once: %s" % arg)
+                single_value_seen.add(arg)
             index += 2
+            if arg in ("--stage", "--runner", "--capacity"):
+                # These values are printed into the fixed report
+                # lines, so a line break inside one is printed as a
+                # space: a value can never write a line of its own
+                # into a report.
+                value = value.replace("\r", " ").replace("\n", " ")
             if arg == "--stage":
                 parsed["stage"] = value
             elif arg == "--runner":
@@ -260,9 +278,15 @@ def simple_form(result):
     slot4 = ["Stage: %s." % result["stage"],
              "Tier applied: %s." % result["tier_applied"]]
     if result["base_disagreement"]:
+        # Slot 4 disagreement form, Section 5.8: the disagreement
+        # sentence, one Identification sentence per distinct base,
+        # and the sentence that no pinned base is applied.
+        slot4.append("Pinned base: disagreement in the records "
+                     "identifying the base.")
         for base in result["base_identifications"]:
-            slot4.append("Pinned base: %s, hash %s, %d bytes." % (
+            slot4.append("Identification: %s, hash %s, %d bytes." % (
                 base["name"], base["hash"], base["bytes"]))
+        slot4.append("No pinned base is applied for this run.")
     elif result["pinned_base"]:
         base = result["pinned_base"]
         slot4.append("Pinned base: %s, hash %s, %s bytes." % (
@@ -275,18 +299,49 @@ def simple_form(result):
         result["counting_table_hash"]))
     slot4.append("Diagnostic catalogue: version %s." %
                  result["diagnostic_catalogue_version"])
-    if result["called_versions"]:
-        slot4.append("Table version the base calls for: %s." %
-                     ", ".join(result["called_versions"]))
+    if result["base_disagreement"]:
+        # The called for sentences print per identification in this
+        # form, never in single value form, as Section 5.8 states.
+        not_stated = "not stated in the records identifying the base"
+        for entry in result["called_by_base"]:
+            for fact, values in (
+                    ("version", entry["versions"]),
+                    ("hash", entry["hashes"])):
+                head = ("Table %s the base in this identification "
+                        "calls for: %s: " % (fact, entry["name"]))
+                if len(values) > 1:
+                    slot4.append(head + "disagreement in the "
+                                 "records identifying the base.")
+                    for value in values:
+                        slot4.append("Stated value: %s." % value)
+                elif values:
+                    slot4.append(head + "%s." % values[0])
+                else:
+                    slot4.append(head + "%s." % not_stated)
     else:
-        slot4.append("Table version the base calls for: not stated "
-                     "in the records identifying the base.")
-    if result["called_hashes"]:
-        slot4.append("Table hash the base calls for: %s." %
-                     ", ".join(result["called_hashes"]))
-    else:
-        slot4.append("Table hash the base calls for: not stated in "
-                     "the records identifying the base.")
+        # A called for fact in disagreement prints in the called for
+        # disagreement form at Section 5.8; an agreed fact prints in
+        # its single value form.
+        for fact, disagreed, driving, printed in (
+                ("version", result["called_version_disagreement"],
+                 result["driving_called_versions"],
+                 result["called_versions"]),
+                ("hash", result["called_hash_disagreement"],
+                 result["driving_called_hashes"],
+                 result["called_hashes"])):
+            if disagreed:
+                slot4.append(
+                    "Table %s the base calls for: disagreement in "
+                    "the records identifying the base." % fact)
+                for value in driving:
+                    slot4.append("Stated value: %s." % value)
+            elif printed:
+                slot4.append("Table %s the base calls for: %s." % (
+                    fact, ", ".join(printed)))
+            else:
+                slot4.append(
+                    "Table %s the base calls for: not stated in the "
+                    "records identifying the base." % fact)
     lines.append(" ".join(slot4))
     # Slot 5, the rollup line.
     if result["run_kind"] == "PRECHECK":
@@ -647,19 +702,20 @@ def run(argv):
     named += [(path, "base") for path in parsed["base_record"]]
     named += [(path, "context") for path in parsed["context"]]
     captured = muster_shell.capture_inputs(named)
-    context_names = {os.path.basename(path)
-                     for path in parsed["context"]}
-    base_names = {os.path.basename(path)
-                  for path in parsed["base_record"]}
     files = []
     usable = False
     for entry in captured:
-        kind = muster_core.classify_file(entry, context_names,
-                                         base_names)
+        kind = muster_core.classify_file(entry)
         files.append((entry, kind))
         if entry.status == "read" and kind != "ignored":
             usable = True
     if not usable:
+        # The cannot start outcome issues no report and no verdict,
+        # and it prints one plain notice naming the outcome, so a
+        # user at a gate does not meet a blank screen.
+        sys.stderr.write(
+            "Cannot start: none of the named inputs could be read, "
+            "so no run started and no report is issued.\n")
         return 4
     try:
         table_data, _raw, table_hash = muster_shell.load_data_file(

@@ -436,3 +436,127 @@ class TestShellLabels(MusterCase):
                                  "projection.md": projection})
         count = {c["name"]: c for c in self.agentic(res)["counts"]}
         self.assertEqual(count["Audit team"]["counted_total"], 3)
+
+
+class TestStep15Round1FixesShell(ShellStaging):
+    """Step 15 round 1 fix round tests: manifest order, naming,
+    classification, and ignored inputs."""
+
+    def test_files_read_order_groups_before_names(self):
+        # Step 15 round 1, C-F1: the files read list stands in
+        # canonical manifest order, by input group first and then by
+        # the path as named, in the Simple slot 10 line and in the
+        # Agentic inputs_read list alike.
+        res, _ = self.run_stage({
+            "roster.md": staffed(),
+            "zzz-step-record.md": "# Step record\n",
+            "aaa-gate.md": "# Gate record\n"})
+        self.assert_rollup(res, "PASS", 0)
+        self.assertEqual(self.agentic(res)["inputs_read"],
+                         ["roster.md", "zzz-step-record.md",
+                          "aaa-gate.md"])
+        supplied = [line for line in res.stdout.splitlines()
+                    if line.startswith("Supplied set:")]
+        self.assertTrue(supplied)
+        line = supplied[0]
+        positions = [line.find(name) for name in
+                     ("roster.md", "zzz-step-record.md", "aaa-gate.md")]
+        self.assertTrue(all(position >= 0 for position in positions))
+        self.assertEqual(positions, sorted(positions))
+
+    def test_two_namings_keep_the_completed_key_naming(self):
+        # Step 15 round 1, C-F2: where two namings name one file, the
+        # naming kept is the first under the completed key, group
+        # first and then the path as named, whichever order the
+        # operator named them in.
+        self.require_product()
+        root = self.stage_dir()
+        first = self.write_file(root, "a-roster-copy.md", staffed())
+        second = root / "b-roster-copy.md"
+        os.link(first, second)
+        for order in ((first, second), (second, first)):
+            with self.subTest(order=[p.name for p in order]):
+                res = self.invoke_paths(list(order))
+                self.assert_rollup(res, "PASS", 0)
+                self.assertEqual(self.agentic(res)["inputs_read"],
+                                 ["a-roster-copy.md"])
+
+    def test_roster_named_supplied_and_context_stays_supplied(self):
+        # Step 15 round 1, BR-6: a roster named both as a supplied
+        # file and as a context file stands in the supplied set under
+        # the supplied naming; the context naming does not remove it.
+        self.require_product()
+        root = self.stage_dir()
+        roster = self.write_file(root, "roster.md", staffed())
+        res = self.invoke([str(roster), "--context", str(roster),
+                           "--stage", "Step 99", "--runner",
+                           "Fixture Auditor", "--capacity", "Auditor"])
+        self.assert_rollup(res, "PASS", 0)
+        self.assertIn("roster.md", self.agentic(res)["inputs_read"])
+
+    def test_shared_basename_context_file_does_not_collide(self):
+        # Step 15 round 1, BR-6: two different files sharing one
+        # basename in different directories do not collide: the
+        # roster named as a supplied file stands as the roster, and
+        # the note named as context stands as context.
+        self.require_product()
+        root = self.stage_dir()
+        roster = self.write_file(root / "one", "shared.md", staffed())
+        note = self.write_file(root / "two", "shared.md",
+                               "# Context\n")
+        res = self.invoke([str(roster), "--context", str(note),
+                           "--stage", "Step 99", "--runner",
+                           "Fixture Auditor", "--capacity", "Auditor"])
+        self.assert_rollup(res, "PASS", 0)
+
+    def test_roster_sharing_basename_with_base_record_stays_supplied(self):
+        # Step 15 round 1, BR-6: a roster sharing a basename with a
+        # base record file in another directory stands as the roster
+        # under its own supplied naming.
+        self.require_product()
+        root = self.stage_dir()
+        roster = self.write_file(root / "one", "base.md", staffed())
+        record = self.write_file(
+            root / "two", "base.md",
+            "# Tier record\n\n"
+            "Pinned base: Fixture Base One, hash %s, 12345 bytes.\n"
+            "Table version the base calls for: 1.0.0-fixture.\n"
+            % ("0123456789abcdef" * 4))
+        res = self.invoke([str(roster), "--base-record", str(record),
+                           "--stage", "Step 99", "--runner",
+                           "Fixture Auditor", "--capacity", "Auditor"])
+        self.assert_rollup(res, "PASS", 0)
+
+    def test_roster_not_ignored_for_name_substrings(self):
+        # Step 15 round 1, BR-7: a genuine roster is not ignored for
+        # substrings in its file name.
+        for name in ("chat-roster.md", "prompt-roster.md",
+                     "transcript-roster.md", "chatham-roster.md",
+                     "promptly-roster.md", "rosterchat.md",
+                     "roster.json", "roster.bin"):
+            with self.subTest(name=name):
+                res, _ = self.run_stage({name: staffed()})
+                self.assert_rollup(res, "PASS", 0)
+
+    def test_roster_not_ignored_for_a_prose_spawn_word(self):
+        # Step 15 round 1, BR-7: a roster is not ignored whole for
+        # the quoted word spawns standing in its text, in a prose
+        # mention or in an export field line.
+        for line in ('Note: the word "spawns" appears in this '
+                     'prose.',
+                     '"spawns": []'):
+            with self.subTest(line=line):
+                res, _ = self.run_stage(
+                    {"roster.md": staffed(extra_lines=[line])})
+                self.assert_rollup(res, "PASS", 0)
+
+    def test_undecodable_file_listed_unread_only(self):
+        # Step 15 round 1, C-F5: a file whose bytes are undecodable
+        # stands in the unread list only, never in both lists of one
+        # report.
+        bad = staffed().encode("utf-8") + b"\nNote: \xff\xfe.\n"
+        res, _ = self.run_stage({"roster.md": bad})
+        agentic = self.agentic(res)
+        self.assertNotIn("roster.md", agentic["inputs_read"])
+        self.assertIn("roster.md", agentic["inputs_unread"])
+        self.assertNotIn("this run read roster.md", res.stdout)

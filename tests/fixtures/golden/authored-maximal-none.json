@@ -37,7 +37,7 @@
     "claim_cap_sentence": "This report checks the records named in it for consistency with the staffing rules named in it. It does not prove that any agent was actually spawned, that any work was done independently, or that the records supplied are complete.",
     "claimed_freshness_facts_not_stated": [],
     "context_files": [],
-    "counting_table_hash": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+    "counting_table_hash": "7858e693a3632a9bad69a2d9fa51b60ce5265441d631c4ea84b94ee6ae40f385",
     "counting_table_version": "1.0.0-fixture",
     "counts_deciding": [],
     "diagnostic_catalogue_version": "1.0.0-fixture",

@@ -1,7 +1,7 @@
 Muster-lite staffing report: Step 99 Fixture Stage.
 This report checks the records named in it for consistency with the staffing rules named in it. It does not prove that any agent was actually spawned, that any work was done independently, or that the records supplied are complete.
 Muster-lite is a grade L2 records checker. It is not the DQ-012 isolated checker, and grade L3 is not available for labelling any record from this tool.
-Stage: Step 99 Fixture Stage. Tier applied: not proven from the supplied records. Pinned base: Fixture Base One, hash 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef, 12345 bytes. Counting table: version 1.0.0-fixture, hash abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789. Diagnostic catalogue: version 1.0.0-fixture. Table version the base calls for: not stated in the records identifying the base. Table hash the base calls for: not stated in the records identifying the base.
+Stage: Step 99 Fixture Stage. Tier applied: not proven from the supplied records. Pinned base: Fixture Base One, hash 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef, 12345 bytes. Counting table: version 1.0.0-fixture, hash 7858e693a3632a9bad69a2d9fa51b60ce5265441d631c4ea84b94ee6ae40f385. Diagnostic catalogue: version 1.0.0-fixture. Table version the base calls for: not stated in the records identifying the base. Table hash the base calls for: not stated in the records identifying the base.
 Rollup: UNVERIFIABLE. Exit code: 3.
 Counts: none. No count in the supplied records decides this stage.
 Step total: 0 counted in this stage, against the expected step total of 4 in the counting table. Round: no rounds. Difference: 4.

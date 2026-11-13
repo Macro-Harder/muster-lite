@@ -104,7 +104,8 @@ class TestCompositionWithStubs(MusterCase):
                      ("Colour lens Blue", 1, "counted in base"),
                      ("Colour lens Purple", 3, "counted in base")])],
             board=BOARD)}
-        self.run_with_stubs(stub_words(**{"team minimums": "FAIL"}),
+        self.run_with_stubs(stub_words(**{"team minimums": "FAIL",
+                                          "distinctness": "FAIL"}),
                             files)
 
     def test_fail_outranks_unverifiable_stub(self):
@@ -121,14 +122,23 @@ class TestCompositionWithStubs(MusterCase):
             files)
 
     def test_unverifiable_outranks_not_proven_stub(self):
-        files = {"note.md": "# A record with no roster for the stage.\n"}
+        files = {"roster.md": roster_text(
+                     teams=[("Audit team", None, AUDIT)], board=BOARD,
+                     extra_lines=[
+                         "The rest of this roster file is truncated.",
+                         "Work product for Colour lens Red: notes.md, "
+                         "a notes part under R-12."]),
+                 "notes.md": "# Notes product\n\nAuthor record: "
+                             "### ###.\n"}
         self.run_with_stubs(stub_words(
             **{"distinctness": "UNVERIFIABLE",
                "artefact linkage": "NOT PROVEN"}), files)
 
     def test_not_proven_outranks_pass_stub(self):
         files = {"roster.md": roster_text(
-            teams=[("Audit team", None, AUDIT)], board=BOARD)}
+            teams=[("Audit team", None, AUDIT)], board=BOARD,
+            claim_lines=["Freshness claim: family 2 held for this "
+                         "stage."])}
         self.run_with_stubs(stub_words(
             **{"claimed freshness": "NOT PROVEN"}), files)
 

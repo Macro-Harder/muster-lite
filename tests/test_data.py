@@ -453,3 +453,207 @@ class TestShipIdentity(MusterCase):
             DATA / "catalogue-nan.json")
         self.assertEqual(res.returncode, 6)
         self.assert_in_stdout(res, "TOOL FAULT")
+
+
+class TestStep15Round1FixesData(MusterCase):
+    """Step 15 round 1 fix round tests: identifiers, slot 4 forms,
+    and the shipped counting table."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def test_placeholder_holder_words_never_count(self):
+        # Step 15 round 1, BR-1: a placeholder holder word, and a
+        # name standing alone that no record in the set issues as an
+        # identifier form, never count toward a minimum.
+        for value in ("TBD", "TBC", "unknown", "pending",
+                      "awaiting assignment", "NA", "N/A", "Bob", "A",
+                      "x"):
+            with self.subTest(value=value):
+                res, _ = self.run_stage(
+                    {"roster.md": self.roster_with_holder(value)})
+                self.assert_report_present(res)
+                self.assertNotEqual(rollup_of(res), "PASS")
+                counts = {c["name"]: c
+                          for c in self.agentic(res)["counts"]}
+                self.assertLess(counts["Audit team"]["counted_total"],
+                                3)
+
+    def test_roster_of_placeholder_holders_does_not_pass(self):
+        # Step 15 round 1, BR-1: three placeholder holders together
+        # count as nobody, and the run does not pass.
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", "TBD", "counted in base"),
+                     ("Colour lens Blue", "TBC", "counted in base"),
+                     ("Colour lens Purple", "unknown",
+                      "counted in base")])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 0)
+
+    def test_base_disagreement_slot4_stands_in_brief_form(self):
+        # Step 15 round 1, C-F3: where the records identifying the
+        # base disagree, slot 4 prints the disagreement sentence, one
+        # Identification sentence per distinct base, the sentence
+        # that no pinned base is applied, and the called for values
+        # per identification, and the Agentic form presents no base
+        # as pinned.
+        other = ("# Tier record\n\n"
+                 "Pinned base: Fixture Base Two, hash %s, 999 bytes.\n"
+                 "Table version the base calls for: 1.0.0-fixture.\n"
+                 % ("fedcba9876543210" * 4))
+        res, _ = self.run_stage({"roster.md": simple_roster(),
+                                 "base.md": base_record(),
+                                 "tier-two.md": other})
+        self.assert_rollup(res, "UNVERIFIABLE", 3)
+        self.assert_in_stdout(
+            res, "Pinned base: disagreement in the records "
+                 "identifying the base.")
+        self.assert_in_stdout(
+            res, "Identification: Fixture Base One, hash %s, 12345 "
+                 "bytes." % ("0123456789abcdef" * 4))
+        self.assert_in_stdout(
+            res, "Identification: Fixture Base Two, hash %s, 999 "
+                 "bytes." % ("fedcba9876543210" * 4))
+        self.assert_in_stdout(res, "No pinned base is applied for "
+                                   "this run.")
+        self.assert_in_stdout(
+            res, "Table version the base in this identification "
+                 "calls for: Fixture Base One: 1.0.0-fixture.")
+        agentic = self.agentic(res)
+        self.assertIsNone(agentic["pinned_base_name"])
+        self.assertIsNone(agentic["pinned_base_hash"])
+
+    def test_called_for_disagreement_slot4_stands_in_brief_form(self):
+        # Step 15 round 1, C-F4: where the identifying records agree
+        # on the base but state two called for versions, the sentence
+        # for that fact prints the disagreement sentence and one
+        # Stated value sentence per stated value.
+        text = base_record(called_version="1.0.0-fixture") + (
+            "Table version the base calls for: 2.0.0-other.\n")
+        res, _ = self.run_stage({"roster.md": simple_roster(),
+                                 "base.md": text})
+        self.assert_rollup(res, "UNVERIFIABLE", 3)
+        self.assert_in_stdout(
+            res, "Table version the base calls for: disagreement in "
+                 "the records identifying the base.")
+        self.assert_in_stdout(res, "Stated value: 1.0.0-fixture.")
+        self.assert_in_stdout(res, "Stated value: 2.0.0-other.")
+
+    def test_gutted_counting_table_takes_tool_fault(self):
+        # Step 15 round 1, BR-4: a counting table that parses as a
+        # JSON object but carries missing or wrongly typed rule data
+        # is a damaged shipped file and takes the tool fault outcome.
+        import tempfile
+        from pathlib import Path
+        shipped = json.loads(
+            self.require_data_file("counting-table.json").read_text(
+                encoding="utf-8"))
+        variants = {}
+        variants["empty object"] = {}
+        no_bases = dict(shipped)
+        del no_bases["team_bases"]
+        variants["team_bases deleted"] = no_bases
+        word_bases = dict(shipped)
+        word_bases["team_bases"] = "word"
+        variants["team_bases as a word"] = word_bases
+        word_minimum = json.loads(json.dumps(shipped))
+        word_minimum["team_bases"]["Audit team"]["Low"] = "three"
+        variants["a minimum as the word three"] = word_minimum
+        for label, table in variants.items():
+            with self.subTest(variant=label):
+                tmp = tempfile.TemporaryDirectory()
+                self.addCleanup(tmp.cleanup)
+                fixture = Path(tmp.name) / "table-variant.json"
+                fixture.write_text(json.dumps(table), encoding="utf-8")
+                res = TestCountingTableAsData.run_with_data_file(
+                    self, "counting-table.json", fixture)
+                self.assertEqual(res.returncode, 6)
+                self.assert_in_stdout(res, "TOOL FAULT")
+                self.assertIsNone(rollup_of(res))
+
+    def test_table_position_occupied_by_directory_takes_tool_fault(self):
+        # Step 15 round 1, BR-5: where the counting table position
+        # beside the entry is occupied, by a directory, that position
+        # governs: the run faults instead of borrowing a table from
+        # another tree.
+        from tests.support import (find_entry, run_entry_direct,
+                                   stage_entry_tree)
+        import shutil
+        import tempfile
+        from pathlib import Path
+        entry = find_entry()
+        if entry is None:
+            self.fail("product does not exist: no command entry "
+                      "stands in the build repo or the installed "
+                      "tree")
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        staged_entry = stage_entry_tree(entry, Path(tmp.name))
+        (staged_entry.parent / "counting-table.json").mkdir()
+        catalogue = self.require_data_file("diagnostic-catalogue.json")
+        shutil.copyfile(catalogue,
+                        staged_entry.parent / "diagnostic-catalogue.json")
+        roster = Path(tmp.name) / "roster.md"
+        roster.write_text(simple_roster(), encoding="utf-8")
+        res = run_entry_direct(
+            staged_entry,
+            [str(roster), "--stage", "Step 99", "--runner",
+             "Fixture Auditor", "--capacity", "Auditor"],
+            cwd=tmp.name)
+        self.assertEqual(res.returncode, 6)
+        self.assert_in_stdout(res, "TOOL FAULT")
+
+    def test_env_named_tree_table_never_governs(self):
+        # Step 15 round 1, BR-5: a tree named by the MUSTER_LITE_HOME
+        # environment variable never supplies the counting table: its
+        # altered minimum of 99 does not govern the run.
+        from tests.support import (find_entry, run_entry_direct,
+                                   stage_entry_tree)
+        import tempfile
+        from pathlib import Path
+        entry = find_entry()
+        if entry is None:
+            self.fail("product does not exist: no command entry "
+                      "stands in the build repo or the installed "
+                      "tree")
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        staged_entry = stage_entry_tree(entry, Path(tmp.name))
+        env_tree = Path(tmp.name) / "env-tree"
+        env_tree.mkdir()
+        shipped = json.loads(
+            self.require_data_file("counting-table.json").read_text(
+                encoding="utf-8"))
+        altered = json.loads(json.dumps(shipped))
+        altered["team_bases"]["Audit team"]["Low"] = 99
+        altered["per_step_rows"] = [
+            {"minimum": 99, "step": 99, "team": "Audit team",
+             "team_count": 3}]
+        (env_tree / "counting-table.json").write_text(
+            json.dumps(altered), encoding="utf-8")
+        roster = Path(tmp.name) / "roster.md"
+        roster.write_text(simple_roster(), encoding="utf-8")
+        res = run_entry_direct(
+            staged_entry,
+            [str(roster), "--stage", "Step 99", "--runner",
+             "Fixture Auditor", "--capacity", "Auditor"],
+            cwd=tmp.name, env_extra={"MUSTER_LITE_HOME": str(env_tree)})
+        if res.returncode == 6:
+            self.assert_in_stdout(res, "TOOL FAULT")
+        else:
+            counts = {c["name"]: c
+                      for c in self.agentic(res)["counts"]}
+            self.assertEqual(counts["Audit team"]["minimum"], 3)

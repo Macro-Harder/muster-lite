@@ -8,6 +8,7 @@ report form renders. Nothing in this module reads a file, writes a
 file, or depends on the order the supplied set was named in.
 """
 
+import json
 import re
 
 CLAIM_CAP = (
@@ -59,6 +60,13 @@ COLOURS = ("Red", "Blue", "Purple", "Green", "Yellow", "Orange",
 
 NON_IDENTIFIERS = ("", "not recorded", "none", "no id recorded")
 
+PLACEHOLDER_WORDS = (
+    "tbd", "tbc", "tba", "unknown", "pending", "awaiting",
+    "awaiting assignment", "na", "n/a", "unassigned", "not assigned",
+    "vacant", "to be determined", "to be confirmed",
+    "to be assigned", "placeholder",
+)
+
 
 def is_full_id(value):
     return bool(value) and bool(FULL_ID.match(value))
@@ -70,7 +78,12 @@ def is_identifier(value):
     A full session identifier counts standing whole. A name form
     identifier counts as the complete string issued. A shortened
     session identifier, a placeholder, a blank, a fragment, and the
-    words not recorded never count.
+    words not recorded never count. A placeholder word never counts,
+    and a name standing alone never counts: a roster presenting a
+    short name does not by itself make the name an issued form, so a
+    name form identifier stands as a complete name of more than one
+    word, as the record sets that issue identifiers in a name form
+    present them.
     """
     if value is None:
         return False
@@ -79,12 +92,16 @@ def is_identifier(value):
     lowered = value.lower()
     if lowered.strip() in NON_IDENTIFIERS:
         return False
+    if lowered.strip() in PLACEHOLDER_WORDS:
+        return False
     if "fragment" in lowered or "placeholder" in lowered:
         return False
     if PARTIAL_ID.match(value.strip()) and any(
             ch.isdigit() for ch in value):
         return False
     if not any(ch.isalpha() for ch in value):
+        return False
+    if len(value.split()) < 2:
         return False
     return True
 
@@ -143,28 +160,70 @@ def round_sort(key):
 # Supplied set classification
 
 
-def classify_file(captured, context_names, base_names):
-    """The kind of one captured file, from its name and its text."""
-    display = captured.display
-    if display in context_names:
+def _is_spawn_export(text):
+    """Whether a text stands in the spawn export form.
+
+    A spawn export is a JSON object carrying a spawns or spawn key.
+    The quoted word standing in prose, or in a field line of a
+    record of another kind, is a mention of an export, not an
+    export, and never makes the file one.
+    """
+    stripped = text.strip()
+    if not stripped.startswith("{"):
+        return False
+    try:
+        data = json.loads(stripped)
+    except ValueError:
+        return bool(re.match(r'\{\s*"spawns?"\s*:', stripped))
+    return isinstance(data, dict) and ("spawns" in data
+                                       or "spawn" in data)
+
+
+def classify_file(captured):
+    """The kind of one captured file, from the groups the operator
+    named it under and its content form.
+
+    Classification never rests on a basename alone: two different
+    files that share a basename stand each under its own naming.
+    The naming groups govern in this order. A file named only as a
+    context file is context, respecting the group it was named
+    under. A file named as a base record is a base record. A roster
+    artifact named as a supplied file stands in the supplied set as
+    the roster, even where it is also named as a context file: a
+    context naming does not remove the stage roster from the
+    supplied set. Any other file also named as a context file
+    stands as context. What remains is classified by its content
+    form and its name, with the brief, prompt, and transcript name
+    rule standing after the roster check, so it reaches only files
+    whose content is not a roster artifact.
+    """
+    groups = captured.groups
+    if groups == {"context"}:
         return "context"
-    if display in base_names:
+    if "base" in groups:
         return "base record"
+    display = captured.display
     lowered = display.lower()
     if captured.status != "read":
         return "unread"
-    if lowered.endswith(".json") or lowered.endswith(".bin"):
-        return "ignored"
     text = captured.text
     if text is None:
         return "record"
-    if '"spawns"' in text or '"spawn"' in text:
-        return "ignored"
-    if "chat" in lowered or "transcript" in lowered \
-            or "prompt" in lowered:
-        return "ignored"
     if _is_roster_artifact(text):
         return "roster"
+    if "context" in groups:
+        return "context"
+    if "chat" in lowered or "transcript" in lowered \
+            or "prompt" in lowered:
+        # A brief text, a prompt text, or a chat transcript presents
+        # nothing as evidence, under brief Section 2.2 item 4. This
+        # rule stands after the roster check: a file whose content
+        # is a roster artifact is a roster, whatever its name says.
+        return "ignored"
+    if _is_spawn_export(text):
+        return "ignored"
+    if lowered.endswith(".json") or lowered.endswith(".bin"):
+        return "ignored"
     if "evidence" in lowered and "register" in lowered:
         return "evidence register"
     if "register" in lowered:
@@ -1327,11 +1386,11 @@ def freshness_checks(facts):
 
 
 FORM_SETTLEMENT_PATTERNS = (
-    (re.compile(r"(\w+) form (?:template )?provides an author "
+    (re.compile(r"(\w{1,64}) form (?:template )?provides an author "
                 r"record field"), True),
-    (re.compile(r"(\w+) form (?:template )?provides no author "
+    (re.compile(r"(\w{1,64}) form (?:template )?provides no author "
                 r"record field"), False),
-    (re.compile(r"(\w+) form carries no author record"), False),
+    (re.compile(r"(\w{1,64}) form carries no author record"), False),
 )
 
 
@@ -1643,6 +1702,40 @@ def linkage_checks(facts, files, by_display):
     return checks, ordered, roster_only, defects
 
 
+def _manifest_group_rank(kind):
+    """The input group rank of one file kind under grill B1."""
+    if kind in ("roster", "step record", "tier record",
+                "base record"):
+        return 1
+    if kind == "work product":
+        return 3
+    return 4
+
+
+def _inputs_read_in_manifest_order(files):
+    """The files read list in canonical manifest order.
+
+    Canonical manifest order is by input group first, under grill
+    B1, and then by the path as named, as Section 5.3 states and as
+    slot 10 of the Simple form and the Agentic inputs_read list both
+    print it. A file whose bytes are undecodable is reported as
+    unread under Section 6 and never stands in this list.
+    """
+    seen = set()
+    keyed = []
+    for captured, kind in files:
+        if captured.status != "read" or captured.decode_failed:
+            continue
+        if kind in ("ignored", "context"):
+            continue
+        if captured.display in seen:
+            continue
+        seen.add(captured.display)
+        keyed.append((_manifest_group_rank(kind), captured.display))
+    keyed.sort()
+    return [display for _rank, display in keyed]
+
+
 # ----------------------------------------------------------------
 # The run computation
 
@@ -1766,6 +1859,24 @@ def compute(files, table_data, catalogue_data, table_hash, params):
         identity_bad = True
     table_hash_printed = called_hashes[0] if called_hashes \
         else table_hash
+    # Per identification called for values, for the slot 4
+    # disagreement form at Section 5.8: for each distinct base, the
+    # called for values the records identifying that base state.
+    called_by_base = []
+    for entry in distinct_bases:
+        sources = {source for (n, h, b, source, _k)
+                   in facts.base_ids if (n, h, b) == entry}
+        versions = []
+        for value, source, _k in facts.called_versions:
+            if source in sources and value not in versions:
+                versions.append(value)
+        hashes = []
+        for value, source, _k in facts.called_hashes:
+            if source in sources and value not in hashes:
+                hashes.append(value)
+        called_by_base.append({"name": entry[0],
+                               "versions": versions,
+                               "hashes": hashes})
 
     # Freshness first: proven breaches exclude holders from counts.
     fresh_checks, excluded_holders, fresh_not_stated, fresh_claimed = \
@@ -1947,13 +2058,18 @@ def compute(files, table_data, catalogue_data, table_hash, params):
         "tier_applied": tier if tier else
             "not proven from the supplied records",
         "tier": tier,
-        "pinned_base": pinned,
+        "pinned_base": None if base_disagreement else pinned,
         "base_identifications": [
             {"name": name, "hash": hash_value, "bytes": size}
             for name, hash_value, size in distinct_bases],
         "base_disagreement": base_disagreement,
         "called_versions": called_versions,
         "called_hashes": called_hashes,
+        "called_by_base": called_by_base,
+        "called_version_disagreement": len(driving_versions) > 1,
+        "called_hash_disagreement": len(driving_hashes) > 1,
+        "driving_called_versions": driving_versions,
+        "driving_called_hashes": driving_hashes,
         "counting_table_version": table.version,
         "counting_table_hash": table_hash_printed,
         "counting_table_hash_captured": table_hash,
@@ -1971,7 +2087,8 @@ def compute(files, table_data, catalogue_data, table_hash, params):
             if coverage and coverage[-1]["total"] == 0 else [],
         "context_files": sorted(
             {captured.display for captured, kind in files
-             if kind == "context" and captured.status == "read"}),
+             if kind == "context" and captured.status == "read"
+             and not captured.decode_failed}),
         "uncounted_appendix": _appendix_entries(facts),
         "exempt_account": _exempt_account(facts),
         "consequence": "",
@@ -1984,24 +2101,24 @@ def compute(files, table_data, catalogue_data, table_hash, params):
         "manifest_groups": {
             "group 1": sorted(
                 {captured.display for captured, kind in files
-                 if captured.status == "read" and kind in (
+                 if captured.status == "read"
+                 and not captured.decode_failed and kind in (
                      "roster", "step record", "tier record",
                      "base record")}),
             "group 3": sorted(
                 {captured.display for captured, kind in files
                  if captured.status == "read"
+                 and not captured.decode_failed
                  and kind == "work product"}),
             "group 4": sorted(
                 {captured.display for captured, kind in files
-                 if captured.status == "read" and kind in (
+                 if captured.status == "read"
+                 and not captured.decode_failed and kind in (
                      "stage register", "gate record", "record",
                      "evidence register")}),
         },
         "truncated_files": sorted(facts.truncated_files),
-        "inputs_read": sorted(
-            {captured.display for captured, kind in files
-             if captured.status == "read" and kind != "ignored"
-             and kind != "context"}),
+        "inputs_read": _inputs_read_in_manifest_order(files),
         "inputs_ignored": sorted(
             {captured.display for captured, kind in files
              if kind == "ignored" and captured.status == "read"}),
