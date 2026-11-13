@@ -143,10 +143,23 @@ def _raw_holder_tokens(value):
 
 
 # Closed label forms, for the label limb of the full identifier
-# definition at brief Section 5.3, in the round 5 form. A value
+# definition at brief Section 5.3, in the round 7 form. A value
 # standing as a slot label rather than an issued identifier is
-# judged on the shape of the value, in three limbs, and every
-# element of the rule stands enumerated here.
+# judged on the shape of the value, in six limbs, and every
+# element of the rule stands enumerated here. Limbs one to
+# three stand in their round 5 form; limbs four and five stand
+# added by the round 6 charge on the same ground; limb six
+# stands added by the round 7 charge. The judgement stands on
+# the normalised tokens of the value, under the whole value
+# normalisation stated at the placeholder passage above: a run
+# of single letters standing apart joins into the word they
+# spell before any limb reads the value, so a spaced letter
+# form of a label judges exactly as its joined form judges, as
+# the product judges every other whole value under the closed
+# forms. A genuine value whose spaced letters join into no
+# label form keeps counting on the standing grounds: Mary
+# S M I T H joins into Mary Smith and counts as that name
+# counts.
 #
 # Limb one, the digit limb, is pure shape and names no head word
 # at all: where any token of the value as written carries a
@@ -180,6 +193,69 @@ def _raw_holder_tokens(value):
 # tokens alone, stands in a label form in that shape as well,
 # as in Seat No and Holder Number.
 #
+# Limb four, the bare label limb, round 6: a value carrying no
+# number tail at all stands in a label form where every token
+# of it is a label head word or a field word, and at least one
+# token of it is a label head word. A label head word here is
+# one of the label head words above or its plural formed by a
+# trailing s: the word name stands among those words, so a Name
+# tail is closed by this limb in the same shape. The field
+# words are the whole field element of this limb: id,
+# identifier, and code, each in its singular form or its
+# plural formed by a trailing s. This limb closes Seat ID and
+# Holder ID (a head word with a field word tail), Seat Name
+# and Holder Name (a head word with the head word name as
+# tail), and Seat Holder (two label head words together). A
+# single letter token is no label head word under this limb:
+# a single letter stands as an initial before a surname in the
+# issued name form, so J Seat and A Holder stand outside this
+# limb and keep counting, as the round 5 register pins them.
+#
+# Limb five, the plural marker tail limb, round 6: a value
+# whose last token is a number marker in its plural form, nos
+# or numbers, standing after label head tokens alone in the
+# limb two sense, stands in a label form in that shape, as in
+# Seat Numbers, Holder Numbers, and Chair Numbers. The plural
+# marker forms are the whole tail element of this limb: the
+# marker words of limb three with a trailing s standing as
+# the whole last token.
+#
+# Limb six, the vocabulary limb, round 7: a value stands in a
+# label form where every token of it stands in the enumerated
+# label vocabulary and at least one token of it is a label
+# head word or a field word, in whatever combination those
+# tokens stand. The enumerated vocabulary is the whole element
+# of this limb: the label head words and their plurals formed
+# by a trailing s, the field words and their plurals formed by
+# a trailing s, the number markers in every position (no and
+# number, and their plural forms nos and numbers), the spelled
+# cardinal and ordinal words, digit tokens, and single
+# letters. A single letter token stands in the vocabulary,
+# with two standing letter shapes excepted from this limb,
+# each a value of two tokens: a single letter standing before
+# a label head word, which counts on the initial ground of
+# limb four, as J Seat and A Holder count with the letter
+# standing as an initial before a surname; and a label head
+# word standing before a single letter, which counts on the
+# letter tail ground, as Seat A and Holder A count with the
+# letter standing as no enumerated tail. A field word beside
+# a single letter stands in neither shape and refuses under
+# this limb, as A ID and ID A refuse. This limb closes
+# the combinations the position
+# tests of limbs two, three, and five do not read, as in Seat
+# ID One and Seat ID Number (a field word in the head before a
+# closed tail) and No Seat and Seat Numbers Number (a marker
+# standing before the head word, or between the head word and
+# its tail), and field words standing together with no head
+# word among them, as in ID Code. This limb stands beside
+# limbs one to five and subsumes none of them: a value with no
+# head word and no field word stands outside it, and such a
+# value still refuses where a standing limb closes its shape,
+# as A One refuses under limb two and A Numbers refuses under
+# limb five. Limb four stands inside this limb in extension
+# (every token a head word or a field word, with a head word
+# among them), and stands unchanged in its own form beside it.
+#
 # The distinguishing ground between a label and a complete
 # name under limbs two and three is the head: a label head is
 # made of label head tokens alone, while a complete name
@@ -191,10 +267,47 @@ def _raw_holder_tokens(value):
 # no spelled tail stands in no limb at all: Holder Smith, Seat
 # Jones, J Seat, and Mary Holder Smith keep counting.
 #
+# The distinguishing ground under limbs four and five, stated
+# token by token. Under limb four, read the value token by
+# token: the value is a label only where every token is a
+# label head word or a field word, with at least one label
+# head word among them. Where any token is neither, the value
+# carries a word of a name and counts on that word. Fixture
+# Name counts on that ground: fixture is no label head word
+# and no field word, so the word Name inside it stands as one
+# word of an issued name, as Mary Name counts with mary as its
+# outside word, Name Smith counts with smith as its outside
+# word, and John Name Smith counts the same way. A single
+# letter token is neither a label head word nor a field word
+# under this limb, so a value carrying one stands outside the
+# limb on that token: J Seat and A Holder count on that
+# ground, the letter standing as an initial. Under limb five
+# the ground is the limb three ground with the marker in its
+# plural form: the value is a label only where every token
+# before the plural marker tail is a label head token, and
+# Fixture Numbers counts because fixture is no label head
+# token, as Fixture Number counts under limb three.
+#
+# The distinguishing ground under limb six is the token test
+# of limb four widened to the vocabulary: the value is a label
+# only where every token stands in the enumerated vocabulary,
+# with a head word or a field word among them. Where any token
+# stands outside the vocabulary, that token is a word of a
+# name and the value counts on that word: Fixture ID One
+# counts on that ground, fixture standing outside the
+# vocabulary beside a field word and a spelled tail, as Smith
+# ID One counts with smith as its outside word. A value built
+# wholly from marker, spelled number, and single letter
+# tokens, with no head word and no field word among them,
+# stands outside limb six on the round 7 charge condition
+# itself, which requires a head word or a field word; its
+# standing is recorded in the round 7 fix register at its
+# named bound and is not closed by this limb.
+#
 # Stopping ground: this rule grows only when a charged act
-# adds a named element, a head word, a marker, or a spelled
-# number word, together with a test naming it. It does not
-# grow by probing or by synonymy.
+# adds a named element, a head word, a marker, a field word,
+# or a spelled number word, together with a test naming it.
+# It does not grow by probing or by synonymy.
 _LABEL_HEAD_WORDS = frozenset((
     "seat", "holder", "chair", "member", "agent", "auditor",
     "reviewer", "coordinator", "captain", "person", "worker",
@@ -202,6 +315,12 @@ _LABEL_HEAD_WORDS = frozenset((
 ))
 
 _LABEL_NUMBER_MARKERS = ("no", "number")
+
+_LABEL_NUMBER_MARKERS_PLURAL = ("nos", "numbers")
+
+_LABEL_FIELD_WORDS = frozenset((
+    "id", "identifier", "code",
+))
 
 _SPELLED_CARDINALS = frozenset((
     "one", "two", "three", "four", "five", "six", "seven",
@@ -233,14 +352,46 @@ def _is_label_head_token(token):
     return token in _LABEL_NUMBER_MARKERS
 
 
-def _is_label_holder(value):
-    tokens = _raw_holder_tokens(value)
+def _is_label_head_word(token):
+    if token in _LABEL_HEAD_WORDS:
+        return True
+    return token.endswith("s") and token[:-1] in _LABEL_HEAD_WORDS
+
+
+def _is_label_field_token(token):
+    if token in _LABEL_FIELD_WORDS:
+        return True
+    return token.endswith("s") and token[:-1] in _LABEL_FIELD_WORDS
+
+
+def _is_label_vocabulary_token(token):
+    if len(token) == 1 and token.isalpha():
+        return True
+    if any(ch.isdigit() for ch in token):
+        return True
+    if _is_label_head_word(token) or _is_label_field_token(token):
+        return True
+    if token in _LABEL_NUMBER_MARKERS:
+        return True
+    if token in _LABEL_NUMBER_MARKERS_PLURAL:
+        return True
+    return token in _SPELLED_TAIL_WORDS
+
+
+def _is_label_token_list(tokens):
     if not tokens:
         return False
     if any(any(ch.isdigit() for ch in token) for token in tokens):
         return True
     if len(tokens) < 2:
         return False
+    if tokens[-1] in _LABEL_NUMBER_MARKERS_PLURAL and all(
+            _is_label_head_token(token) for token in tokens[:-1]):
+        return True
+    if all(_is_label_head_word(token) or _is_label_field_token(token)
+           for token in tokens) and any(
+               _is_label_head_word(token) for token in tokens):
+        return True
     if tokens[-1] in _LABEL_NUMBER_MARKERS and all(
             _is_label_head_token(token) for token in tokens[:-1]):
         return True
@@ -250,7 +401,22 @@ def _is_label_holder(value):
     if 0 < cut < len(tokens) and all(
             _is_label_head_token(token) for token in tokens[:cut]):
         return True
+    if all(_is_label_vocabulary_token(token) for token in tokens) \
+            and any(_is_label_head_word(token)
+                    or _is_label_field_token(token)
+                    for token in tokens) \
+            and not (len(tokens) == 2 and (
+                (len(tokens[0]) == 1 and tokens[0].isalpha()
+                 and _is_label_head_word(tokens[1]))
+                or (_is_label_head_word(tokens[0])
+                    and len(tokens[1]) == 1
+                    and tokens[1].isalpha()))):
+        return True
     return False
+
+
+def _is_label_holder(value):
+    return _is_label_token_list(_normalised_holder_tokens(value))
 
 
 def _normalised_holder_tokens(value):
@@ -272,6 +438,210 @@ def _normalised_holder_tokens(value):
             joined.append(token)
     flush()
     return joined
+
+
+# The wholly spaced name form, round 8. A holder value can stand
+# wholly as one run of spaced single letters, with no intact word
+# in it at all. The joining normalisation then joins the letters
+# of every word of the value into one token, because no longer
+# token stands in the run to end it, and the value would refuse
+# on its token count alone. Where the word it joins into stands
+# in no label form and in no closed form, the value counts on
+# the initialled name ground of brief Section 5.3, read in the
+# form this passage states: the joined word read as an initial
+# and a name word, a first letter standing as an initial before
+# the rest of the word standing as the name word it precedes, in
+# the same shape in which limb four states the initial ground (a
+# single letter stands as an initial before a surname in the
+# issued name form) and limb six excepts it. J S M I T H counts
+# on that ground, its joined word read as the initial J before
+# the name word Smith, and J S E A T and A H O L D E R count in
+# the excepted shape itself, one initial before a surname that
+# is a label head word. The letter tail values count in the
+# mirror shape, as Seat A and Holder A count in their plain
+# forms. A run joining into a label word standing on its own
+# refuses, as S E A T refuses with its joined word a label head
+# word, and a run joining into label tokens under the standing
+# limbs refuses, judged on a segmentation of the joined word
+# into enumerated vocabulary words of two letters or more with
+# at most one single letter piece among them, the one initial or
+# letter tail a name in this shape can carry. S E A T I D refuses
+# on that ground, its joined word standing as the tokens seat
+# and id under limb four, and S E A T O N E refuses as seat and
+# one under limb two. A run whose joined word stands in a closed
+# form refuses on that form: a placeholder word, a placeholder
+# phrase or a words list entry with its spaces removed, a strong
+# placeholder token standing on its own or at the head of the
+# joined word, the word fragment standing on its own or at the
+# head of the joined word, or a value in the not recorded words. The residue of this form stands named in the
+# round 8 fix register at its bound and is not closed here: a
+# segmentation needing at least two single letter pieces is
+# ambiguous on the face of a wholly spaced run with a name word
+# spelled letter by letter, and a segmentation with at most one
+# single letter piece can read a name word that opens or closes
+# with a vocabulary word and one letter as label tokens under a
+# different boundary.
+
+_SEGMENT_WORDS = frozenset(
+    word
+    for word in (
+        tuple(_LABEL_HEAD_WORDS)
+        + tuple(word + "s" for word in _LABEL_HEAD_WORDS)
+        + tuple(_LABEL_FIELD_WORDS)
+        + tuple(word + "s" for word in _LABEL_FIELD_WORDS)
+        + tuple(_LABEL_NUMBER_MARKERS)
+        + tuple(_LABEL_NUMBER_MARKERS_PLURAL)
+        + tuple(_SPELLED_TAIL_WORDS))
+    if len(word) >= 2)
+
+
+def _segment_category(token):
+    single = len(token) == 1 and token.isalpha()
+    head_word = _is_label_head_word(token)
+    field_word = _is_label_field_token(token)
+    marker = token in _LABEL_NUMBER_MARKERS
+    marker_plural = token in _LABEL_NUMBER_MARKERS_PLURAL
+    spelled = token in _SPELLED_TAIL_WORDS
+    head_token = single or head_word or marker
+    return (single, head_word, field_word, marker, marker_plural,
+            spelled, head_token)
+
+
+def _segment_step(state, category):
+    (count, singles, any_head, any_field, all_head_field, all_head,
+     before_last_all_head, last_marker, last_marker_plural, phase,
+     first_single, first_head, last_single, last_head) = state
+    (single, head_word, field_word, marker, marker_plural, spelled,
+     head_token) = category
+    if phase == 1:
+        if spelled:
+            next_phase = 2 if count >= 1 else 0
+        elif head_token:
+            next_phase = 1
+        else:
+            next_phase = 0
+    elif phase == 2:
+        next_phase = 2 if spelled else 0
+    else:
+        next_phase = 0
+    return (min(3, count + 1), singles + (1 if single else 0),
+            any_head or head_word, any_field or field_word,
+            all_head_field and (head_word or field_word),
+            all_head and head_token, all_head, marker, marker_plural,
+            next_phase, single if count == 0 else first_single,
+            head_word if count == 0 else first_head,
+            single, head_word)
+
+
+def _segment_final_is_label(state):
+    (count, singles, any_head, any_field, all_head_field, all_head,
+     before_last_all_head, last_marker, last_marker_plural, phase,
+     first_single, first_head, last_single, last_head) = state
+    if count < 2:
+        return False
+    if all_head_field and any_head:
+        return True
+    if last_marker and before_last_all_head:
+        return True
+    if last_marker_plural and before_last_all_head:
+        return True
+    if phase == 2:
+        return True
+    if (any_head or any_field) and not (
+            count == 2 and ((first_single and last_head)
+                            or (first_head and last_single))):
+        return True
+    return False
+
+
+def _joined_word_segments_to_label(word):
+    """Whether a joined word stands as label tokens under the
+    standing limbs, on a segmentation into enumerated vocabulary
+    words of two letters or more with at most one single letter
+    piece, judged by the same limb conditions the token list
+    rule applies."""
+    initial = (0, 0, False, False, True, True, True, False, False,
+               1, False, False, False, False)
+    states = {0: {initial}}
+    for position in range(len(word)):
+        current = states.get(position)
+        if not current:
+            continue
+        pieces = [(word[position], position + 1)]
+        for candidate in _SEGMENT_WORDS:
+            if word.startswith(candidate, position):
+                pieces.append((candidate,
+                               position + len(candidate)))
+        for token, next_position in pieces:
+            category = _segment_category(token)
+            for state in current:
+                if category[0] and state[1] >= 1:
+                    continue
+                stepped = _segment_step(state, category)
+                states.setdefault(next_position, set()).add(stepped)
+    return any(_segment_final_is_label(state)
+               for state in states.get(len(word), ()))
+
+
+def _joined_word_is_closed(word):
+    if word in _PLACEHOLDER_STRONG_TOKENS:
+        return True
+    for token in _PLACEHOLDER_STRONG_TOKENS:
+        if word.startswith(token) and len(word) > len(token):
+            # A strong placeholder token standing at the head of
+            # the joined word, with the rest of the word standing
+            # after it, as the spaced form of a value carrying
+            # that strong token as one of its tokens.
+            return True
+    if word in NON_IDENTIFIERS:
+        return True
+    if word == "fragment":
+        return True
+    if word.startswith("fragment") and len(word) > len("fragment"):
+        # The fragment label form in its spaced shape: the word
+        # fragment standing at the head of the joined word, with
+        # the letters after it standing as the letters that form
+        # follows, judged as the raw token rule judges the value
+        # as written.
+        return True
+    for entry in tuple(PLACEHOLDER_WORDS) + tuple(
+            _PLACEHOLDER_PHRASES):
+        if word == re.sub(r"[^0-9a-z]+", "", entry):
+            return True
+    return False
+
+
+def _joined_word_is_label_word(word):
+    if _is_label_head_word(word) or _is_label_field_token(word):
+        return True
+    if word in _LABEL_NUMBER_MARKERS:
+        return True
+    if word in _LABEL_NUMBER_MARKERS_PLURAL:
+        return True
+    return word in _SPELLED_TAIL_WORDS
+
+
+def _wholly_spaced_name_counts(value):
+    """Whether a value standing wholly as one run of spaced
+    single letters counts as an initialled name, on the form
+    stated at the round 8 passage above."""
+    tokens = _normalised_holder_tokens(value)
+    if len(tokens) != 1:
+        return False
+    word = tokens[0]
+    if len(word) < 3 or not word.isalpha():
+        return False
+    raw = _raw_holder_tokens(value)
+    if not raw or len(raw) != len(word) or not all(
+            len(token) == 1 and token.isalpha() for token in raw):
+        return False
+    if _joined_word_is_closed(word):
+        return False
+    if _joined_word_is_label_word(word):
+        return False
+    if _joined_word_segments_to_label(word):
+        return False
+    return True
 
 
 def is_full_id(value):
@@ -300,12 +670,29 @@ def is_identifier(value):
     1a; or a spelled number or ordinal tail standing after label
     head tokens alone, as in Seat one or Seat first; or a number
     marker tail standing after label head tokens alone, as in
-    Seat No), where it stands in the fragment
+    Seat No; or a value carrying no number tail whose tokens
+    are label head words and field words alone, as in Seat ID,
+    Seat Name, or Seat Holder; or a number marker in its plural
+    form standing as the tail after label head tokens alone, as
+    in Seat Numbers; or one of those forms standing in spaced
+    letters, judged in the joined form the normalisation
+    produces, as in Seat I D or Seat O N E; or a value whose
+    tokens all stand in the enumerated label vocabulary with a
+    label head word or a field word among them, in whatever
+    combination they stand, as in Seat ID One or No Seat),
+    where it stands in the fragment
     label form (the word fragment followed only by a single letter
     or by a token with no letters, as in fragment a or
     fragment 0000), or where
     it repeats one component word of the phrase set, as in Unknown
-    Unknown. A genuine complete name is judged the same way and
+    Unknown. A value standing wholly as one run of spaced single
+    letters, which the joining step leaves as one token, counts
+    where the word it joins into stands in none of those forms
+    and in no closed form, read as an initial and a name word, as
+    J S M I T H counts as the initialled name it spells, while a
+    run joining into a label word standing on its own, as in
+    S E A T, or into label tokens under the limbs, as in
+    S E A T I D, refuses on those same grounds. A genuine complete name is judged the same way and
     stands: a name that merely contains a phrase component word
     as one word among its own name words, such as Placeholder
     Smith or Pending Sutton, counts on its own form, and a
@@ -358,7 +745,14 @@ def is_identifier(value):
             and alpha_tokens[0] in _PLACEHOLDER_COMPONENT_WORDS:
         return False
     if len(tokens) < 2:
-        return False
+        # A value standing wholly as one run of spaced single
+        # letters stands as one token after the joining step, and
+        # counts only on the wholly spaced name form stated at
+        # the round 8 passage: the joined word read as an initial
+        # and a name word, where that word stands in no label
+        # form and in no closed form. Every other one token value
+        # refuses here, as a name standing alone refuses.
+        return _wholly_spaced_name_counts(value)
     return True
 
 

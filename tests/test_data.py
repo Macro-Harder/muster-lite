@@ -1800,3 +1800,445 @@ class TestStep15Round5FixesData(MusterCase):
             roster, "# Context\n\nHolding: fixer in Round 1, holder "
                     "%s.\n" % sid(1))
         self.assert_rollup(res, "FAIL", 1)
+
+
+class TestStep15Round6FixesData(MusterCase):
+    """Step 15 round 6 fix round tests: label values carrying no
+    number tail at all, judged on the shape of the value in the
+    same label rule as the standing limbs."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def assert_holder_counts(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def test_label_no_tail_field_forms_never_count(self):
+        # Step 15 round 6, R6-NB-1, family one: a value whose
+        # tokens are label head words alone, or label head words
+        # with a field word tail, is a field label and never
+        # counts, with no number tail of any kind standing in it.
+        # The forms are a head word with an ID field tail, a head
+        # word with a Name field tail (the word name standing in
+        # the label head words as well), two label head words
+        # standing together, and the same field tails in their
+        # plural and identifier and code forms.
+        for value in ("Seat ID", "Holder ID", "Agent ID",
+                      "Seat Name", "Holder Name", "Seat Holder",
+                      "Chair ID", "Member Name", "Seat IDs",
+                      "Holder Identifier", "Seat Code",
+                      "Seat Names"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_label_marker_plural_tail_forms_never_count(self):
+        # R6-NB-1, family two: the number marker word pluralised
+        # as the tail stands in the marker form as its singular
+        # does. The forms are the three charged values, a single
+        # letter head standing before the plural marker, and a
+        # plural head standing before it.
+        for value in ("Seat Numbers", "Holder Numbers",
+                      "Chair Numbers", "A Numbers",
+                      "Seats Numbers"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_label_no_tail_full_rosters_do_not_pass_round6(self):
+        # R6-NB-1: full rosters held by the round 6 label forms
+        # alone name nobody and do not pass, one in ID field
+        # labels, one in plural marker labels, and one in Name
+        # field labels and paired head words.
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        rosters = (
+            ("Seat ID", "Holder ID", "Agent ID"),
+            ("Seat Numbers", "Holder Numbers", "Chair Numbers"),
+            ("Seat Name", "Holder Name", "Seat Holder"),
+        )
+        for holders in rosters:
+            with self.subTest(holders=holders):
+                text = roster_text(
+                    teams=[("Audit team", None,
+                            [(role, holder, "counted in base")
+                             for role, holder in zip(roles, holders)])],
+                    board=self.BOARD)
+                res, _ = self.run_stage({"roster.md": text})
+                self.assert_report_present(res)
+                self.assertNotEqual(rollup_of(res), "PASS")
+                counts = {c["name"]: c
+                          for c in self.agentic(res)["counts"]}
+                self.assertEqual(
+                    counts["Audit team"]["counted_total"], 0)
+
+    def test_genuine_names_still_count_beside_round6_label_rule(self):
+        # Control for R6-NB-1: complete names in their issued
+        # forms keep counting. A genuine name carrying the word
+        # Name as one of its own name words counts where a word
+        # outside the label head and field classes stands in the
+        # value (Fixture Name, Mary Name, Name Smith, and John
+        # Name Smith), a genuine name carrying the plural marker
+        # as one of its words counts on the same ground (Fixture
+        # Numbers, beside Fixture Number and Fixture Name One),
+        # and the standing genuine controls of the earlier limbs
+        # keep counting, among them the initial and surname forms
+        # J Seat and A Holder, where the single letter stands as
+        # an initial and no label head word tail follows it in a
+        # label shape, and Holder Smith and Mary Holder Smith,
+        # where a label word stands as one word of a name beside
+        # a word outside the classes.
+        for value in ("Fixture Name", "Mary Name", "Name Smith",
+                      "John Name Smith", "Fixture Numbers",
+                      "Fixture Name One", "Fixture Number",
+                      "Chosen One", "Holder Smith", "Seat Jones",
+                      "J Seat", "A Holder", "Smith Holder",
+                      "Mary Holder Smith", "John Smith III"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+
+class TestStep15Round7FixesData(MusterCase):
+    """Step 15 round 7 fix round tests: label values in their
+    spaced letter forms, judged in the joined form the product
+    normalisation produces, and values built wholly from the
+    label rule enumerated vocabulary in any combination."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def assert_holder_counts(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def assert_full_roster_refuses(self, holders):
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 0)
+
+    def test_spaced_letter_label_forms_never_count(self):
+        # Step 15 round 7, R7-NB-1: a label value in its spaced
+        # letter form refuses exactly as its joined form refuses,
+        # under the limb that closes the joined form. The forms
+        # stand for all four tail limbs: a field word spelled out
+        # after an intact head, with the part spaced variants; a
+        # spelled tail spelled out; a marker tail spelled out;
+        # and a plural marker tail spelled out in whole or part.
+        for value in ("Seat I D", "Holder I D", "Agent I D",
+                      "Seat C O D E", "Member C O D E",
+                      "Seat Id s", "Holder I d",
+                      "Seat O N E", "Seat T W O", "Seat T H R E E",
+                      "Holder T W O",
+                      "Seat N O", "Holder N U M B E R",
+                      "Seat N U M B E R S", "Chair N o s"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_spaced_letter_full_rosters_do_not_pass_round7(self):
+        # R7-NB-1: full rosters held by spaced letter label forms
+        # alone name nobody and do not pass, one in spaced field
+        # labels and one in spaced spelled number labels.
+        for holders in (("Seat I D", "Holder I D", "Agent I D"),
+                        ("Seat O N E", "Holder T W O",
+                         "Seat T H R E E")):
+            with self.subTest(holders=holders):
+                self.assert_full_roster_refuses(holders)
+
+    def test_vocabulary_combination_forms_never_count(self):
+        # Step 15 round 7, R7-NB-2: a value whose every token
+        # stands in the label rule enumerated vocabulary, with at
+        # least one head word or field word among its tokens,
+        # refuses in whatever combination those tokens stand.
+        # Shape one is a field word in the head before a closed
+        # tail; shape two is a marker word out of tail position,
+        # or markers stacked. The further forms are the Breaker
+        # paper direct drive companions in the same two shapes,
+        # with field words alone.
+        for value in ("Seat ID One", "Seat ID Number",
+                      "Seat ID Numbers", "Holder ID No",
+                      "Seat Code Two", "ID Seat One",
+                      "Seat No ID", "No Seat", "Number Seat",
+                      "Numbers Seat", "Seat Numbers Number",
+                      "Holder Numbers No",
+                      "Holder ID Number", "Seat Code Nos",
+                      "Seat ID Nos", "Seat ID First",
+                      "Holder Identifier One", "Chair Code Number",
+                      "Seat No Name", "Numbers Holder",
+                      "ID Code"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_vocabulary_full_rosters_do_not_pass_round7(self):
+        # R7-NB-2: full rosters held by vocabulary combination
+        # forms alone name nobody and do not pass, one in stacked
+        # field and marker labels and one in markers standing
+        # before the head word.
+        for holders in (("Seat ID One", "Seat ID Number",
+                         "Seat ID Numbers"),
+                        ("No Seat", "Number Seat", "Numbers Seat")):
+            with self.subTest(holders=holders):
+                self.assert_full_roster_refuses(holders)
+
+    def test_standing_limbs_still_refuse_without_head_or_field(self):
+        # The vocabulary limb stands beside limbs one to five and
+        # does not subsume them: values carrying no head word and
+        # no field word still refuse where a standing limb closes
+        # their shape, a spelled tail after a single letter or a
+        # marker, and a plural marker tail after a single letter
+        # or a marker.
+        for value in ("A One", "No One", "A Numbers",
+                      "No Numbers"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_genuine_names_still_count_beside_round7_label_rule(self):
+        # Controls for R7-NB-1 and R7-NB-2: genuine values keep
+        # counting on the standing grounds. A value with any
+        # token outside the enumerated vocabulary is a name on
+        # that token, Fixture ID One and its like, even where it
+        # carries a field word and a closed tail. A genuine name
+        # in spaced letters whose joined letters spell no label
+        # form counts, Mary S M I T H counting with its surname
+        # spelled out, and the initialled name forms and the
+        # standing genuine controls keep counting.
+        for value in ("Fixture ID One", "Fixture ID Numbers",
+                      "Smith ID One", "Mary S M I T H",
+                      "J R Smith", "Fixture Name",
+                      "Fixture Numbers", "Fixture Number",
+                      "Fixture Name One", "Chosen One",
+                      "Holder Smith", "Seat Jones", "J Seat",
+                      "A Holder", "Seat A", "Holder A",
+                      "Smith Holder",
+                      "Mary Holder Smith", "John Smith III"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_bound_wordings_still_count_beside_round7_vocabulary(self):
+        # The vocabulary limb catches no bound wording: every
+        # bound named class carries at least one token outside
+        # the enumerated vocabulary, and one wording per bound
+        # class still counts on that ground, as its bound states.
+        # C4-F1: Appointment still outstanding, its words outside
+        # the vocabulary. Bound R5-LABEL-RESIDUAL class 1, an
+        # outside head word before a spelled tail: Counter one.
+        # Class 2, a spelled word outside the enumerated sets
+        # after a label head: Holder billion. Class 3, a number
+        # tail in a notation outside the enumerated sets: Agent
+        # XII. Bound R6-NO-TAIL-RESIDUAL class 1, a field word
+        # tail outside the enumerated field words: Seat
+        # Reference. Class 2, a head word outside the enumerated
+        # head words beside a field word: Bench ID.
+        for value in ("Appointment still outstanding",
+                      "Counter one", "Holder billion", "Agent XII",
+                      "Seat Reference", "Bench ID"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_no_head_vocabulary_residue_still_counts(self):
+        # Residue at Bound R7-NO-HEAD-RESIDUAL, named in the
+        # round 7 fix register in the open and not presented as
+        # closed: values built wholly from marker, spelled
+        # number, and letter tokens, with no head word and no
+        # field word among them, stand outside the round 7
+        # charge, whose vocabulary limb requires a head word or
+        # a field word, and outside every standing limb shape.
+        # They count, as the bound states, and join the
+        # identifier judgement question before the board.
+        for value in ("Nos One", "One No", "One Two",
+                      "No One No"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+
+class TestStep15Round8FixesData(MusterCase):
+    """Step 15 round 8 fix round tests: genuine initialled names
+    standing wholly as one run of spaced single letters, whose
+    joining run crosses the word boundary of the name as written,
+    counted on the initialled name ground where the joined word
+    is no label form and no closed form, with label forms in the
+    same shape still refusing."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def assert_holder_counts(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def assert_full_roster_refuses(self, holders):
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 0)
+
+    def assert_full_roster_counts(self, holders):
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def test_spaced_letter_names_across_boundary_count(self):
+        # Step 15 round 8, R8-NB-1: the six charged values, each
+        # the spaced letter form of a name that counts in its
+        # plain form, standing wholly as one run of spaced single
+        # letters. The joining run crosses the word boundary and
+        # leaves each name as one token in the joined form: the
+        # initialled forms of J Smith, J Seat, and A Holder, the
+        # letter tail forms of Seat A and Holder A with every
+        # letter spaced, and the fully spaced complete name John
+        # Smith. No joined word here is a label form under any
+        # standing limb, a closed form, or a set phrase, so each
+        # counts on the initialled name ground, the joined word
+        # read as an initial and a name word.
+        for value in ("J S M I T H", "J S E A T", "A H O L D E R",
+                      "S E A T A", "H O L D E R A",
+                      "J O H N S M I T H"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_spaced_letter_name_full_roster_passes_round8(self):
+        # R8-NB-1: a full roster held by the three initialled
+        # charged values alone counts in full and passes, where
+        # before the cure it counted 0.
+        self.assert_full_roster_counts(
+            ("J S M I T H", "J S E A T", "A H O L D E R"))
+
+    def test_spaced_letter_label_forms_still_refuse_round8(self):
+        # Label forms in the same shape keep refusing: a spaced
+        # run joining into a word that is a label form on its own
+        # (S E A T, C O D E), and spaced runs joining into label
+        # tokens under the standing limbs (S E A T I D, S E A T
+        # O N E, H O L D E R N U M B E R S). S E A T stands here
+        # as a roster value in a mixed staging and in the full
+        # roster below.
+        for value in ("S E A T", "C O D E", "S E A T I D",
+                      "S E A T O N E", "H O L D E R N U M B E R S"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("S E A T", "S E A T I D", "S E A T O N E"))
+
+    def test_round7_spaced_battery_still_refuses_round8(self):
+        # The round 7 spaced battery still refuses in full beside
+        # the round 8 cure: the fifteen spaced letter label values
+        # of round 7, whose runs stand anchored by an intact word
+        # and never stand wholly as one run, judge exactly as
+        # before under the standing limbs.
+        for value in ("Seat I D", "Holder I D", "Agent I D",
+                      "Seat C O D E", "Member C O D E",
+                      "Seat Id s", "Holder I d",
+                      "Seat O N E", "Seat T W O", "Seat T H R E E",
+                      "Holder T W O",
+                      "Seat N O", "Holder N U M B E R",
+                      "Seat N U M B E R S", "Chair N o s"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_genuine_names_still_count_beside_round8(self):
+        # Controls for R8-NB-1: genuine values already counting
+        # keep counting, the spaced genuine names whose runs are
+        # broken by an intact word or joined into a word standing
+        # in no limb, the pinned initial and letter tail forms,
+        # and the six plain counterparts of the charged values.
+        for value in ("Mary S M I T H", "J R Smith",
+                      "John S M I T H", "J J Seat", "Seat J J",
+                      "J Smith", "John Smith", "J Seat",
+                      "A Holder", "Seat A", "Holder A"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_spaced_segmentation_residue_at_bound_round8(self):
+        # Residue at the round 8 bound named in the round 8 fix
+        # register, in the open and not presented as closed. On
+        # the counting side, a wholly spaced form whose only
+        # label reading needs at least two single letter pieces
+        # counts on the name reading that needs none: A B O N E
+        # counts on the reading A Bone, its label reading A B One
+        # needing two single letter pieces. On the refusing side,
+        # a wholly spaced form that does segment into label
+        # tokens with at most one single letter piece refuses on
+        # that reading: I D A S E A T refuses on the reading ID A
+        # Seat, beside its name reading Ida Seat. Both standings
+        # join the identifier judgement question before the board.
+        self.assert_holder_counts("A B O N E")
+        self.assert_holder_refuses("I D A S E A T")
