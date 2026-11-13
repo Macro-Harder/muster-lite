@@ -61,6 +61,17 @@ COLOURS = ("Red", "Blue", "Purple", "Green", "Yellow", "Orange",
 
 NON_IDENTIFIERS = ("", "not recorded", "none", "no id recorded")
 
+# The not recorded words read on the joined form of a value, with
+# its spaces removed, as the placeholder words and the set phrases
+# beside them are read: a spaced or part spaced form of a not
+# recorded value is the same closed value as its plain form, as
+# round 9 states the cure. This set is the entries of
+# NON_IDENTIFIERS in that joined form.
+_NOT_RECORDED_JOINED_FORMS = frozenset(
+    joined for joined in (
+        re.sub(r"[^0-9a-z]+", "", entry) for entry in NON_IDENTIFIERS)
+    if joined)
+
 PLACEHOLDER_WORDS = (
     "tbd", "tbc", "tba", "unknown", "pending", "awaiting",
     "awaiting assignment", "na", "n/a", "unassigned", "not assigned",
@@ -473,7 +484,10 @@ def _normalised_holder_tokens(value):
 # phrase or a words list entry with its spaces removed, a strong
 # placeholder token standing on its own or at the head of the
 # joined word, the word fragment standing on its own or at the
-# head of the joined word, or a value in the not recorded words. The residue of this form stands named in the
+# head of the joined word, or a value in the not recorded words,
+# that list read on the joined form with its spaces removed, as
+# the placeholder words and phrases in this condition are read.
+# The residue of this form stands named in the
 # round 8 fix register at its bound and is not closed here: a
 # segmentation needing at least two single letter pieces is
 # ambiguous on the face of a wholly spaced run with a name word
@@ -593,7 +607,11 @@ def _joined_word_is_closed(word):
             # after it, as the spaced form of a value carrying
             # that strong token as one of its tokens.
             return True
-    if word in NON_IDENTIFIERS:
+    if word in _NOT_RECORDED_JOINED_FORMS:
+        # The not recorded words in their joined form: the word
+        # here already stands with its spaces removed, so it is
+        # read against the joined forms of that closed list, as
+        # the placeholder words and phrases below are read.
         return True
     if word == "fragment":
         return True
@@ -644,6 +662,107 @@ def _wholly_spaced_name_counts(value):
     return True
 
 
+# The mixed spaced run form, round 9. A run of spaced single
+# letters can also stand inside a holder value, beside an intact
+# word, and where that run spans two words of the value as
+# written it joins those two words into one token, in the same
+# crossing the round 8 form states for a wholly spaced run. Such
+# a joined token is judged on the same segmentation standard the
+# round 8 form applies to a wholly spaced run: a segmentation of
+# the joined token into enumerated vocabulary words of two
+# letters or more with at most one single letter piece among
+# them. Where a segmentation of that kind stands and the token
+# list it yields, standing in place of the joined token in the
+# value, stands as label tokens under the standing limbs in
+# _is_label_token_list, the value refuses exactly as its plain
+# counterpart refuses: Seat I D O N E refuses as Seat ID One
+# refuses, its joined token idone standing as id and one in the
+# token list seat, id, and one. Where no segmentation of that
+# kind yields label tokens, the joined token stands as a name
+# word on the standing grounds, as the joined token of Ida
+# S E A T is the one word seat standing beside a name, and the
+# joined token of Fixture I D O N E yields fixture, id, and one,
+# which stands in no limb on its outside word, exactly as its
+# plain counterpart counts. A token standing as written, not
+# joined from a run of at least two spaced single letters, is
+# never segmented by this form: a name word as written, as
+# idone would stand in Seat Idone, is one word of a name on its
+# face. The wholly spaced form above is untouched by this form:
+# a value standing wholly as one run still judges on that form
+# alone, and the round 8 drivings stand unchanged under it.
+
+def _holder_tokens_and_run_lengths(value):
+    """The normalised tokens of a holder value, with the length
+    of the spaced single letter run each token was joined from,
+    or 0 where the token stands as written."""
+    text = re.sub(r"[^0-9a-z]+", " ", value.lower())
+    joined = []
+    run_lengths = []
+    run = []
+
+    def flush():
+        if run:
+            joined.append("".join(run))
+            run_lengths.append(len(run))
+            del run[:]
+
+    for token in text.split():
+        if len(token) == 1 and token.isalpha():
+            run.append(token)
+        else:
+            flush()
+            joined.append(token)
+            run_lengths.append(0)
+    flush()
+    return joined, run_lengths
+
+
+def _joined_token_segmentations(word):
+    """Every segmentation of a joined token into enumerated
+    vocabulary words of two letters or more with at most one
+    single letter piece among its pieces, in the round 8 form.
+    A segmentation of one piece, the token standing whole as one
+    vocabulary word, is no merging of two words and stands
+    outside this form, so only segmentations of at least two
+    pieces stand returned."""
+    found = []
+
+    def walk(position, singles, pieces):
+        if position == len(word):
+            if len(pieces) >= 2:
+                found.append(tuple(pieces))
+            return
+        if singles == 0:
+            walk(position + 1, 1, pieces + [word[position]])
+        for candidate in _SEGMENT_WORDS:
+            if word.startswith(candidate, position):
+                walk(position + len(candidate), singles,
+                     pieces + [candidate])
+
+    walk(0, 0, [])
+    return found
+
+
+def _mixed_spaced_run_is_label(value):
+    """Whether a holder value stands in a label form through a
+    run of spaced single letters inside it joining two of its
+    words into one token, on the form stated at the round 9
+    passage above."""
+    tokens, run_lengths = _holder_tokens_and_run_lengths(value)
+    if len(tokens) < 2:
+        return False
+    for index, (token, run_length) in enumerate(
+            zip(tokens, run_lengths)):
+        if run_length < 2:
+            continue
+        for pieces in _joined_token_segmentations(token):
+            expanded = tokens[:index] + list(pieces) \
+                + tokens[index + 1:]
+            if _is_label_token_list(expanded):
+                return True
+    return False
+
+
 def is_full_id(value):
     return bool(value) and bool(FULL_ID.match(value))
 
@@ -692,7 +811,22 @@ def is_identifier(value):
     J S M I T H counts as the initialled name it spells, while a
     run joining into a label word standing on its own, as in
     S E A T, or into label tokens under the limbs, as in
-    S E A T I D, refuses on those same grounds. A genuine complete name is judged the same way and
+    S E A T I D, refuses on those same grounds. A run of spaced
+    single letters standing inside a value, beside an intact
+    word, judges the same way where it joins two words of the
+    value into one token: where that token segments into
+    enumerated vocabulary words of two letters or more with at
+    most one single letter piece and the token list it yields
+    stands as label tokens under the limbs, the value refuses
+    exactly as its plain counterpart refuses, as Seat I D O N E
+    refuses as Seat ID One refuses, while a joined token that
+    does not so segment stands as a name word, as in Ida
+    S E A T. The not recorded words judge on the joined form of
+    the value, with its spaces removed, as the placeholder words
+    and the set phrases judge, so a spaced or part spaced form
+    of a not recorded value refuses exactly as its plain form
+    refuses, as N O T R E C O R D E D refuses as Not Recorded
+    refuses. A genuine complete name is judged the same way and
     stands: a name that merely contains a phrase component word
     as one word among its own name words, such as Placeholder
     Smith or Pending Sutton, counts on its own form, and a
@@ -706,6 +840,16 @@ def is_identifier(value):
         return True
     lowered = value.lower()
     if lowered.strip() in NON_IDENTIFIERS:
+        return False
+    if re.sub(r"[^0-9a-z]+", "", lowered) \
+            in _NOT_RECORDED_JOINED_FORMS:
+        # The not recorded words judged on the joined form of
+        # the value, with its spaces removed, as the placeholder
+        # words and the set phrases are judged: a spaced form, a
+        # part spaced form, or a form whose spacing differs from
+        # the issued string refuses exactly as its plain form
+        # refuses, as in N O T R E C O R D E D refusing as Not
+        # Recorded refuses.
         return False
     if PARTIAL_ID.match(value.strip()) and any(
             ch.isdigit() for ch in value):
@@ -753,6 +897,15 @@ def is_identifier(value):
         # form and in no closed form. Every other one token value
         # refuses here, as a name standing alone refuses.
         return _wholly_spaced_name_counts(value)
+    if _mixed_spaced_run_is_label(value):
+        # A run of spaced single letters standing inside the
+        # value and joining two of its words into one token
+        # judges on the segmentation standard stated at the
+        # round 9 passage: where the joined token so segments
+        # and the token list it yields stands as label tokens
+        # under the standing limbs, the value refuses exactly
+        # as its plain counterpart refuses.
+        return False
     return True
 
 

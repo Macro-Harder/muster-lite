@@ -2242,3 +2242,202 @@ class TestStep15Round8FixesData(MusterCase):
         # join the identifier judgement question before the board.
         self.assert_holder_counts("A B O N E")
         self.assert_holder_refuses("I D A S E A T")
+
+
+class TestStep15Round9FixesData(MusterCase):
+    """Step 15 round 9 fix round tests: a spaced run of single
+    letters standing inside a holder value, joining two words of
+    the value into one token, judged on the segmentation standard
+    of the round 8 wholly spaced form, and the not recorded
+    values judged on the joined form of the value as the other
+    closed lists are judged."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def assert_holder_counts(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def assert_full_roster_refuses(self, holders):
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 0)
+
+    def assert_full_roster_counts(self, holders):
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def test_mixed_spaced_run_label_values_refuse_round9(self):
+        # Step 15 round 9, R9-NB-1: ten label values, each
+        # standing as one intact word beside a run of spaced
+        # single letters that spans the two remaining words of
+        # the value, so the run joins those two words into one
+        # token no limb reads. The joined token of each one
+        # segments into enumerated vocabulary words under the
+        # round 8 standard, with no single letter piece in eight
+        # of them and the one allowed piece in the remaining two
+        # (numbers and a in the reading of the ninth, code and a
+        # in the tenth), so each refuses exactly as its plain
+        # counterpart refuses.
+        for value in ("Seat I D O N E", "Holder I D N O",
+                      "Seat C O D E T W O", "Holder C O D E N O",
+                      "ID S E A T O N E", "One S E A T I D",
+                      "Seat N O I D", "Member N O S E A T",
+                      "Seat N U M B E R A", "Agent C O D E A"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_mixed_spaced_run_label_full_roster_refuses_round9(self):
+        # R9-NB-1: a full roster held by three label values in
+        # the merged run form alone counts 0, where before the
+        # cure it counted 3 and passed.
+        self.assert_full_roster_refuses(
+            ("Seat I D O N E", "Holder I D N O",
+             "Seat C O D E T W O"))
+
+    def test_mixed_spaced_run_plain_and_partitions_refuse_round9(self):
+        # The plain counterpart of every charged mixed value
+        # keeps refusing beside the cure, and the remaining
+        # partitions of the first value keep refusing with it:
+        # the run joining only one word of the label, the intact
+        # head standing beside a spaced tail word, and the
+        # wholly spaced form of the whole label.
+        for value in ("Seat ID One", "Holder ID No",
+                      "Seat Code Two", "Holder Code No",
+                      "ID Seat One", "One Seat ID", "Seat No ID",
+                      "Member No Seat", "Seat Numbers A",
+                      "Agent Code A",
+                      "Seat I D One", "Seat ID O N E",
+                      "S E A T I D O N E"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_mixed_spaced_run_genuine_values_count_round9(self):
+        # Genuine values keep counting on the standing grounds:
+        # a joined token that does not segment into label tokens
+        # on the round 8 standard stands as a name word. The
+        # pins are the genuine neighbours of the charged class
+        # (Seat Ida in plain form, J S Smith, and Ida S E A T,
+        # whose joined token is the one word seat), the values
+        # whose label reading stands only outside the head of
+        # the value (Fixture I D O N E and Smith S E A T O N E,
+        # whose plain counterparts count on the outside word),
+        # the genuine spaced controls of the round 8 round, and
+        # the wholly spaced surnames of the Breaker paper, whose
+        # label readings each need two single letter pieces.
+        for value in ("Seat Ida", "J S Smith", "Ida S E A T",
+                      "Fixture I D O N E", "Smith S E A T O N E",
+                      "Mary S M I T H", "J R Smith",
+                      "John S M I T H", "J J Seat", "Seat J J",
+                      "Mary H O L D E R", "John S E A T",
+                      "J O N E S", "S T O N E"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_round8_drivings_unchanged_round9(self):
+        # The round 8 drivings stand unchanged under this round
+        # form: the six charged spaced names count and their
+        # full roster passes, the wholly spaced label forms
+        # refuse and their full roster counts 0, and the fifteen
+        # round 7 spaced battery values refuse in full.
+        for value in ("J S M I T H", "J S E A T", "A H O L D E R",
+                      "S E A T A", "H O L D E R A",
+                      "J O H N S M I T H"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+        self.assert_full_roster_counts(
+            ("J S M I T H", "J S E A T", "A H O L D E R"))
+        for value in ("S E A T", "C O D E", "S E A T I D",
+                      "S E A T O N E", "H O L D E R N U M B E R S"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("S E A T", "S E A T I D", "S E A T O N E"))
+        for value in ("Seat I D", "Holder I D", "Agent I D",
+                      "Seat C O D E", "Member C O D E",
+                      "Seat Id s", "Holder I d",
+                      "Seat O N E", "Seat T W O", "Seat T H R E E",
+                      "Holder T W O",
+                      "Seat N O", "Holder N U M B E R",
+                      "Seat N U M B E R S", "Chair N o s"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_not_recorded_spaced_forms_refuse_round9(self):
+        # Step 15 round 9, R9-NB-2: the two multiword values of
+        # the not recorded words in their spaced forms, the
+        # wholly spaced forms and the part spaced forms, refuse
+        # exactly as their plain forms refuse, the closed list
+        # judged on the joined form of the value with its spaces
+        # removed, as the placeholder words and the set phrases
+        # are already judged.
+        for value in ("N O T R E C O R D E D",
+                      "N O I D R E C O R D E D",
+                      "Not R E C O R D E D", "No I D Recorded"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("N O T R E C O R D E D", "N O I D R E C O R D E D",
+             "Not R E C O R D E D"))
+
+    def test_not_recorded_plain_forms_still_refuse_round9(self):
+        # The ground of R9-NB-2 stands unchanged beside the
+        # cure: the plain forms of the two values refuse, and
+        # the single word member of the same list refuses in its
+        # wholly spaced form.
+        for value in ("Not Recorded", "No Id Recorded", "N O N E"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_wholly_spaced_closed_forms_still_refuse_round9(self):
+        # The closed forms beside the not recorded words in
+        # condition (2) of the round 8 form keep refusing in
+        # wholly spaced form after this round change: the set
+        # phrase sample and the placeholder words sample the
+        # round 9 Breaker paper drove through the entry, beside
+        # the strong token and fragment readings at the head of
+        # a joined word.
+        for value in ("T O B E D E C I D E D", "U N K N O W N",
+                      "P L A C E H O L D E R", "A W A I T I N G",
+                      "P E N D I N G", "V A C A N T",
+                      "T B D S M I T H", "F R A G M E N T A B"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
