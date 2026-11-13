@@ -1,0 +1,5 @@
+{
+  "lf_sha256": "37865d05f9d4ebba2c7242bffbf06c7e928d3ad559e9fec3eb1b40d5cfb4df40",
+  "crlf_sha256": "0419c7d7d2db5546ee1640f72c73aa89355f2ca6f87453bc2a4a8d31d0ea967e",
+  "note": "Expected hashes computed from the exact bytes of each file. The CRLF hash is the hash of the CRLF bytes; a run that translated CRLF to LF before hashing prints the LF hash for the CRLF file and fails the fixture."
+}

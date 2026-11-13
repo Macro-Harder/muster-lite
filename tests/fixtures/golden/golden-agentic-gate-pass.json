@@ -1,0 +1,82 @@
+{
+  "checks": [],
+  "claim_cap_sentence": "This report checks the records named in it for consistency with the staffing rules named in it. It does not prove that any agent was actually spawned, that any work was done independently, or that the records supplied are complete.",
+  "claim_disagreements": [],
+  "consequence": "this stage may be claimed as staffed on this run, and a gate may cite this run as its staffing evidence",
+  "context_files": [],
+  "counting_table_hash": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+  "counting_table_version": "1.0.0-fixture",
+  "counts": [
+    {
+      "counted_total": 3,
+      "duplicates_removed": 0,
+      "entries": 3,
+      "exempt_or_uncounted_removed": 0,
+      "minimum": 3,
+      "name": "Audit team",
+      "result": "PASS",
+      "round": "no rounds"
+    },
+    {
+      "counted_total": 1,
+      "duplicates_removed": 0,
+      "entries": 1,
+      "exempt_or_uncounted_removed": 0,
+      "minimum": 1,
+      "name": "Write tests team",
+      "result": "PASS",
+      "round": "no rounds"
+    }
+  ],
+  "coverage": [
+    {
+      "checked": 0,
+      "indeterminate": 0,
+      "not_checked": 0,
+      "outside": 0,
+      "scope": "Audit team",
+      "total": 0
+    },
+    {
+      "checked": 0,
+      "indeterminate": 0,
+      "not_checked": 0,
+      "outside": 0,
+      "scope": "Write tests team",
+      "total": 0
+    },
+    {
+      "checked": 0,
+      "indeterminate": 0,
+      "not_checked": 0,
+      "outside": 0,
+      "scope": "stage",
+      "total": 0
+    }
+  ],
+  "diagnostic_catalogue_version": "1.0.0-fixture",
+  "duplicate_holdings": [],
+  "exempt_account": [],
+  "exit_code": 0,
+  "grade": "L2",
+  "inputs_ignored": [],
+  "inputs_read": [
+    "roster.md"
+  ],
+  "missing_seats": [],
+  "pinned_base_bytes": 12345,
+  "pinned_base_hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "pinned_base_name": "Fixture Base One",
+  "rollup": "PASS",
+  "run_kind": "gate run",
+  "runner_capacity": "Auditor",
+  "runner_name": "Fixture Auditor",
+  "stage": "Step 99 Fixture Stage",
+  "standing_limits": [
+    "coverage not applicable"
+  ],
+  "tier_applied": "Low",
+  "tool_name": "muster-lite",
+  "tool_version": "1.0.0-fixture",
+  "uncounted_appendix": []
+}

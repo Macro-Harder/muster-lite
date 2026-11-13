@@ -1,0 +1,28 @@
+Muster-lite staffing report: PRECHECK: roster evidence only: Step 99 Fixture Stage.
+This report checks the records named in it for consistency with the staffing rules named in it. It does not prove that any agent was actually spawned, that any work was done independently, or that the records supplied are complete.
+Muster-lite is a grade L2 records checker. It is not the DQ-012 isolated checker, and grade L3 is not available for labelling any record from this tool.
+Stage: Step 99 Fixture Stage. Tier applied: Low. Pinned base: Fixture Base One, hash 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef, 12345 bytes. Counting table: version 1.0.0-fixture, hash abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789. Diagnostic catalogue: version 1.0.0-fixture. Table version the base calls for: 1.0.0-fixture. Table hash the base calls for: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789.
+Rollup: PRECHECK NOT PROVEN, run by Fixture Coordinator, coordinator as precheck. Exit code: 2.
+Count: Audit team: 3 minus 0 minus 0 equals 3, against a minimum of 3. Round: no rounds. Result: PASS.
+Count: Write tests team: 1 minus 0 minus 0 equals 1, against a minimum of 1. Round: no rounds. Result: PASS.
+Step total: 4 counted in this stage, against the expected step total of 4 in the counting table. Round: no rounds. Difference: no difference.
+Build union: not computable in a one stage run. A one stage run reads no other stage as seat evidence. Step 12 bound: Step 12 is not in scope for this stage.
+Run by: Fixture Coordinator, acting as coordinator as precheck.
+Standing limits on this rollup:
+Coverage: Audit team: claimed seats checked 0, claimed seats not checked 2, claimed seats total 2, seats presented with the form contract unsettled 0, seats outside the check 0.
+Coverage: Write tests team: claimed seats checked 0, claimed seats not checked 0, claimed seats total 0, seats presented with the form contract unsettled 0, seats outside the check 0. coverage not applicable
+Coverage: stage: claimed seats checked 0, claimed seats not checked 2, claimed seats total 2, seats presented with the form contract unsettled 0, seats outside the check 0.
+Unclaimed freshness families: family 1, family 2, family 3, family 4. Each named family is unproven and does not cap this rollup.
+Claimed freshness families with facts not stated: none.
+Colour completeness: NOT PROVEN. No audit plan or round charge is named in the supplied records. This result does not compose the rollup.
+Single document: this result does not rest on a single document.
+Basis: no seat in this stage rests on the roster alone.
+Plaid: NOT PROVEN. Version 1 of this tool computes no Plaid figure, and unpassable at Plaid is a limit of the tool, not a finding about the records supplied for this run. The pinned base supplied for this run carries no Plaid amounts the tool may use. This result does not compose the rollup where the stage does not claim a Plaid limb.
+Counting table: PARTIAL. The counting table this run computed from stands as the table as far as swept, under S5-E42, and the full exception line recheck at encoding time stands outstanding.
+Chain: advisory only. Shape 1: not run. Chain results do not compose the rollup except where an ordering failure prevents proof of a claim check, and that check then stands in the blocker lines.
+Chain: advisory only. Shape 2: not run. Chain results do not compose the rollup except where an ordering failure prevents proof of a claim check, and that check then stands in the blocker lines.
+Chain: advisory only. Shape 3: not run. Chain results do not compose the rollup except where an ordering failure prevents proof of a claim check, and that check then stands in the blocker lines.
+Blocker: none: artefact linkage: Audit team: S5-E58: expected at least one claimed seat with linkage checked, observed 0 claimed seats checked of 2 claimed seats, evidence roster.md. Missing fact: linkage unchecked for the whole team. Consequence: this stage may not be claimed as staffed on this run.
+Supplied set: this run read roster.md. Context files supplied by manifest: none. No context files were supplied. Inputs supplied and ignored: none.
+Consequence: this run is a precheck. This stage may not be claimed as staffed on this run. No gate may cite this run as an independent verdict. An Auditor run, or a run the Auditor commissioned and repeats or verifies, is required. Records that must change before a gate can cite a clean result: roster.md.
+What this tool did not prove: it did not prove that any agent was actually spawned, that any work was done independently, or that the records supplied are complete.

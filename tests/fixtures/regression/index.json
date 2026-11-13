@@ -1,0 +1,130 @@
+{
+  "cases": [
+    {
+      "id": "staffed-roster",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. Tier: Low.\n\n## Team: Audit team\n- Seat: Colour lens Red; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Red and stage Step 99.\n- Seat: Colour lens Blue; holder 00000000-0000-4000-8000-000000000002; position counted in base; spawn reference names role Colour lens Blue and stage Step 99.\n- Seat: Colour lens Purple; holder 00000000-0000-4000-8000-000000000003; position counted in base; spawn reference names role Colour lens Purple and stage Step 99.\n\n## Team: Write tests team\n- Seat: Test author; holder 00000000-0000-4000-8000-000000000004; position counted in base; spawn reference names role Test author and stage Step 99.\n\n## Review board\n- Board seat: Board member one; holder 00000000-0000-4000-8000-000000000011.\n- Board seat: Board member two; holder 00000000-0000-4000-8000-000000000012.\n- Board seat: Board chair; holder 00000000-0000-4000-8000-000000000013.\n\nBoard chair: holder 00000000-0000-4000-8000-000000000013.\nAudit plan: the fixture audit plan names the colours Red, Blue and Purple for this stage.\n"
+      },
+      "stage": "Step 99",
+      "rollup": "PASS",
+      "exit": 0,
+      "needles": [],
+      "tally_stage": "staffed-roster"
+    },
+    {
+      "id": "staffed-roster-without-two-facts",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. Tier: Low.\n\n## Team: Audit team\n- Seat: Colour lens Red; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Red and stage Step 99.\n- Seat: Colour lens Blue; holder 00000000-0000-4000-8000-000000000002; position counted in base; spawn reference names role Colour lens Blue and stage Step 99.\n- Seat: Colour lens Purple; holder 00000000-0000-4000-8000-000000000003; position counted in base; spawn reference names role Colour lens Purple and stage Step 99.\n\n## Team: Write tests team\n- Seat: Test author; holder 00000000-0000-4000-8000-000000000004; position counted in base; spawn reference names role Test author and stage Step 99.\n\n## Review board\n- Board seat: Board member one; holder 00000000-0000-4000-8000-000000000011.\n- Board seat: Board member two; holder 00000000-0000-4000-8000-000000000012.\n- Board seat: Board chair; holder 00000000-0000-4000-8000-000000000013.\n\n"
+      },
+      "stage": "Step 99",
+      "rollup": "NOT PROVEN",
+      "exit": 2,
+      "needles": [
+        "board chair"
+      ],
+      "tally_stage": "staffed-roster-without-two-facts"
+    },
+    {
+      "id": "passes-as-members",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. Tier: Low.\n\n## Team: Audit team\n- Seat: Colour lens Red; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Red and stage Step 99.\n- Seat: Colour lens Blue; holder 00000000-0000-4000-8000-000000000002; position counted in base; spawn reference names role Colour lens Blue and stage Step 99.\n- Seat: Colour lens Purple; holder 00000000-0000-4000-8000-000000000003; position counted in base; spawn reference names role Colour lens Purple and stage Step 99.\n\n## Team: Write tests team\n- Seat: Test author; holder 00000000-0000-4000-8000-000000000004; position counted in base; spawn reference names role Test author and stage Step 99.\n\n## Review board\n- Board seat: Board member one; holder 00000000-0000-4000-8000-000000000011.\n- Board seat: Board member two; holder 00000000-0000-4000-8000-000000000012.\n- Board seat: Board chair; holder 00000000-0000-4000-8000-000000000013.\n\nStage claim: the three audit passes are members of the Audit team.\n"
+      },
+      "stage": "Step 99",
+      "rollup": "PASS",
+      "exit": 0,
+      "needles": [
+        "claim disagreement"
+      ],
+      "tally_stage": "passes-as-members"
+    },
+    {
+      "id": "panel-simulation",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. Tier: Low.\n\n## Team: Audit team\n- Seat: Colour lens Red; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Red and stage Step 99.\n- Seat: Colour lens Blue; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Blue and stage Step 99.\n- Seat: Colour lens Purple; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Purple and stage Step 99.\n\n## Team: Write tests team\n- Seat: Test author; holder 00000000-0000-4000-8000-000000000004; position counted in base; spawn reference names role Test author and stage Step 99.\n\n## Review board\n- Board seat: Board member one; holder 00000000-0000-4000-8000-000000000011.\n- Board seat: Board member two; holder 00000000-0000-4000-8000-000000000012.\n- Board seat: Board chair; holder 00000000-0000-4000-8000-000000000013.\n\n"
+      },
+      "stage": "Step 99",
+      "rollup": "FAIL",
+      "exit": 1,
+      "needles": [
+        "Critical"
+      ],
+      "tally_stage": "panel-simulation"
+    },
+    {
+      "id": "grouped-papers",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. Tier: Low.\n\n## Team: Audit team\n- Seat: Colour lens Red; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Red and stage Step 99.\n- Seat: Colour lens Blue; holder 00000000-0000-4000-8000-000000000002; position counted in base; spawn reference names role Colour lens Blue and stage Step 99.\n- Seat: Colour lens Purple; holder 00000000-0000-4000-8000-000000000003; position counted in base; spawn reference names role Colour lens Purple and stage Step 99.\n\n## Team: Write tests team\n- Seat: Test author; holder 00000000-0000-4000-8000-000000000004; position counted in base; spawn reference names role Test author and stage Step 99.\n\n## Review board\n- Board seat: Board member one; holder 00000000-0000-4000-8000-000000000011.\n- Board seat: Board member two; holder 00000000-0000-4000-8000-000000000012.\n- Board seat: Board chair; holder 00000000-0000-4000-8000-000000000013.\n\nWork product for the Audit team seats: one grouped paper, papers.md, named for all three seats.\n",
+        "papers.md": "# Grouped paper\n\nOne paper standing for three seats, with no per part author records.\n"
+      },
+      "stage": "Step 99",
+      "rollup": "NOT PROVEN",
+      "exit": 2,
+      "needles": [
+        "roster evidence only"
+      ],
+      "tally_stage": "grouped-papers"
+    },
+    {
+      "id": "roster-entry-no-spawn-record",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. Tier: Low.\n\n## Team: Audit team\n- Seat: Colour lens Red; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Red and stage Step 99.\n- Seat: Colour lens Blue; holder 00000000-0000-4000-8000-000000000002; position counted in base; spawn reference names role Colour lens Blue and stage Step 99.\n- Seat: Colour lens Purple; holder not recorded; position counted in base; spawn reference names role Colour lens Purple and stage Step 99.\n\n## Team: Write tests team\n- Seat: Test author; holder 00000000-0000-4000-8000-000000000004; position counted in base; spawn reference names role Test author and stage Step 99.\n\n## Review board\n- Board seat: Board member one; holder 00000000-0000-4000-8000-000000000011.\n- Board seat: Board member two; holder 00000000-0000-4000-8000-000000000012.\n- Board seat: Board chair; holder 00000000-0000-4000-8000-000000000013.\n\n"
+      },
+      "stage": "Step 99",
+      "rollup": "NOT PROVEN",
+      "exit": 2,
+      "needles": [],
+      "tally_stage": "roster-entry-no-spawn-record"
+    },
+    {
+      "id": "missing-records",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. The roster for this stage was never captured.\n"
+      },
+      "stage": "Step 99",
+      "rollup": "UNVERIFIABLE",
+      "exit": 3,
+      "needles": [],
+      "tally_stage": "missing-records"
+    },
+    {
+      "id": "mutation-coordinator-as-member",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. Tier: Low.\n\n## Team: Audit team\n- Seat: Colour lens Red; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Red and stage Step 99.\n- Seat: Colour lens Blue; holder 00000000-0000-4000-8000-000000000002; position counted in base; spawn reference names role Colour lens Blue and stage Step 99.\n- Seat: Colour lens Purple; holder 00000000-0000-4000-8000-000000000003; position counted in base; spawn reference names role Colour lens Purple and stage Step 99.\n\n## Team: Write tests team\n- Seat: Test author; holder 00000000-0000-4000-8000-000000000004; position counted in base; spawn reference names role Test author and stage Step 99.\n\n## Review board\n- Board seat: Board member one; holder 00000000-0000-4000-8000-000000000011.\n- Board seat: Board member two; holder 00000000-0000-4000-8000-000000000012.\n- Board seat: Board chair; holder 00000000-0000-4000-8000-000000000013.\n\nStage claim: the coordinator is a member of the Audit team.\n"
+      },
+      "stage": "Step 99",
+      "rollup": "PASS",
+      "exit": 0,
+      "needles": [
+        "claim disagreement"
+      ],
+      "tally_stage": "mutation-coordinator-as-member"
+    },
+    {
+      "id": "mutation-two-seats-one-agent",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. Tier: Low.\n\n## Team: Audit team\n- Seat: Colour lens Red; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Red and stage Step 99.\n- Seat: Colour lens Blue; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Blue and stage Step 99.\n- Seat: Colour lens Purple; holder 00000000-0000-4000-8000-000000000003; position counted in base; spawn reference names role Colour lens Purple and stage Step 99.\n\n## Team: Write tests team\n- Seat: Test author; holder 00000000-0000-4000-8000-000000000004; position counted in base; spawn reference names role Test author and stage Step 99.\n\n## Review board\n- Board seat: Board member one; holder 00000000-0000-4000-8000-000000000011.\n- Board seat: Board member two; holder 00000000-0000-4000-8000-000000000012.\n- Board seat: Board chair; holder 00000000-0000-4000-8000-000000000013.\n\n"
+      },
+      "stage": "Step 99",
+      "rollup": "FAIL",
+      "exit": 1,
+      "needles": [
+        "Critical"
+      ],
+      "tally_stage": "mutation-two-seats-one-agent"
+    },
+    {
+      "id": "shared-product-notes",
+      "files": {
+        "roster.md": "# Roster artifact: Step 99\n\nStage: Step 99. Tier: Low.\n\n## Team: Audit team\n- Seat: Colour lens Red; holder 00000000-0000-4000-8000-000000000001; position counted in base; spawn reference names role Colour lens Red and stage Step 99.\n- Seat: Colour lens Blue; holder 00000000-0000-4000-8000-000000000002; position counted in base; spawn reference names role Colour lens Blue and stage Step 99.\n- Seat: Colour lens Purple; holder 00000000-0000-4000-8000-000000000003; position counted in base; spawn reference names role Colour lens Purple and stage Step 99.\n\n## Team: Write tests team\n- Seat: Test author; holder 00000000-0000-4000-8000-000000000004; position counted in base; spawn reference names role Test author and stage Step 99.\n\n## Review board\n- Board seat: Board member one; holder 00000000-0000-4000-8000-000000000011.\n- Board seat: Board member two; holder 00000000-0000-4000-8000-000000000012.\n- Board seat: Board chair; holder 00000000-0000-4000-8000-000000000013.\n\nWork products: notes.md is the shared product of the three Audit team seats.\n",
+        "notes.md": "# Notes\n\nPart one. Author record: 00000000-0000-4000-8000-000000000001.\n\nPart two. Author record: 00000000-0000-4000-8000-000000000002.\n\nPart three. Author record: 00000000-0000-4000-8000-000000000003.\n"
+      },
+      "stage": "Step 99",
+      "rollup": "PASS",
+      "exit": 0,
+      "needles": [
+        "claimed seats checked 3"
+      ],
+      "tally_stage": "shared-product-notes"
+    }
+  ]
+}

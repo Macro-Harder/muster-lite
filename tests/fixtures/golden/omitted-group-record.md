@@ -1,0 +1,9 @@
+# Fixture record: omitted group golden rendering
+
+Bound one, standing in the head of this record: the reader proof stands NOT TAKEN UP, the CQ-1, CQ-2, CQ-6, CQ-8 and CQ-11 reader limbs stay proven in design only for the whole of this build, and the visibility judgement on this fixture is a design inspection of the fixture rendering only and is cited as proof of no reader limb.
+
+Fixture: golden-omitted-group.txt. The supplied set for the fixture stage omits one whole named input group, the work products group (grill B1 group 3), for the stage judged. The expected rendering is fixed from brief section 5.8 as written, including the slot 10 supplied set line and its none wordings and the Advanced form supplied set naming. This fixture encodes no claiming rule, touches no held shape, and states no specimen expectation.
+
+Bound two, the Q7 bound: on a run whose supplied set omits one whole named input group, the Simple form alone does not make the omission visible, because slot 10 lists the files read with no group labels and no absence line; the Advanced form makes the same omission visible through the group labelled manifest it renders in full.
+
+The fixture record reports its visibility criterion under those bounds only: whether the omitted group can be named from the rendering of each form, judged as a design inspection of the fixture rendering. Design inspection result recorded at Step 13: from the Simple form rendering alone the omitted group cannot be named, because slot 10 lists the files read with no group labels and no absence line; from the Advanced form group labelled manifest the omitted group can be named, because no entry stands under the work products group. That judgement is cited as proof of no reader limb, settles no real case, and changes no product behaviour.
