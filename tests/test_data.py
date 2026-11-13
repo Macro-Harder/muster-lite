@@ -1596,3 +1596,207 @@ class TestStep15Round4FixesData(MusterCase):
             roster, "# Context\n\nHolding: fixer in Round 1, holder "
                     "%s.\n" % sid(1))
         self.assert_rollup(res, "FAIL", 1)
+
+
+class TestStep15Round5FixesData(MusterCase):
+    """Step 15 round 5 fix round tests: label holders in their
+    ordinary forms, judged on the shape of the value, and the
+    context freshness scan narrowed to the holding and involvement
+    kinds."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def assert_holder_counts(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def run_with_context(self, roster, context_text):
+        return self.run_stage(
+            {"roster.md": roster, "ctx.md": context_text},
+            context=["ctx.md"])[0]
+
+    def claiming_roster(self, family, extra_lines=()):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD,
+            extra_lines=list(extra_lines),
+            claim_lines=["Freshness claim: family %d held for this "
+                         "stage." % family])
+
+    def test_label_digit_tails_never_count(self):
+        # Step 15 round 5, R5-NB-1: a digit tail in any of its
+        # forms refuses on the shape of the value, whatever word
+        # heads it. The forms are a digit token standing apart
+        # after a role word head, a plural head, a No or Number
+        # marker standing between the head and the digit, a digit
+        # token with letters attached, a separator split digit
+        # form standing held from round 4, and a head of more
+        # than one word standing before the digit.
+        for value in ("Chair 1", "Member 1", "Agent 1", "Auditor 1",
+                      "Reviewer 1", "Coordinator 1", "Captain 1",
+                      "Person 1", "Worker 1", "Judge 1", "Lead 1",
+                      "Slot 1", "Position 1", "Name 1",
+                      "Seats 1", "Holders 1",
+                      "Seat No 1", "Holder Number 1",
+                      "Seat number 1",
+                      "Seat 1a", "Holder A1", "Seat B2",
+                      "Seat 1-2", "Holder 1,000",
+                      "Review Board 1"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_label_spelled_tails_never_count(self):
+        # R5-NB-1: a spelled number or ordinal tail standing
+        # after a label head refuses the same way. The forms are
+        # a spelled cardinal, a spelled ordinal, a single letter
+        # head, a plural head, a No or Number marker standing
+        # between a label head and a spelled tail, a compound
+        # spelled tail, and a label head of more than one word.
+        for value in ("Seat one", "Holder two", "Seat One",
+                      "Holder Three", "A one", "Seat first",
+                      "Seats one", "Holders two",
+                      "Seat No One", "Holder Number Two",
+                      "Seat twenty one", "Seat Holder One"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_label_marker_tail_forms_never_count(self):
+        # R5-NB-1: a value that ends in a No or Number marker
+        # standing after a label head is a label in that form as
+        # well, with no number standing after the marker.
+        for value in ("Seat No", "Holder Number"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_label_full_rosters_do_not_pass_round5(self):
+        # R5-NB-1: full rosters held by the round 5 label forms
+        # alone name nobody and do not pass, one in plain role
+        # word labels and one in spelled number labels.
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        rosters = (
+            ("Chair 1", "Member 2", "Agent 3"),
+            ("Seat one", "Seat two", "Seat three"),
+        )
+        for holders in rosters:
+            with self.subTest(holders=holders):
+                text = roster_text(
+                    teams=[("Audit team", None,
+                            [(role, holder, "counted in base")
+                             for role, holder in zip(roles, holders)])],
+                    board=self.BOARD)
+                res, _ = self.run_stage({"roster.md": text})
+                self.assert_report_present(res)
+                self.assertNotEqual(rollup_of(res), "PASS")
+                counts = {c["name"]: c
+                          for c in self.agentic(res)["counts"]}
+                self.assertEqual(
+                    counts["Audit team"]["counted_total"], 0)
+
+    def test_genuine_names_still_count_beside_round5_label_rule(self):
+        # Control for R5-NB-1: complete names in their issued
+        # forms keep counting. Fixture Name One carries a spelled
+        # number inside an issued name form whose head words are
+        # not label head words alone, the Chosen One class carries
+        # a spelled tail after a head that is no label head word,
+        # and a complete name carrying a label word as one word
+        # of the name stands in no label form.
+        for value in ("Fixture Name One", "Chosen One",
+                      "Selected One", "Designated One",
+                      "Holder Smith", "Seat Jones", "J Seat",
+                      "A Holder", "Smith Holder",
+                      "Mary Holder Smith"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_context_protected_seat_lines_supply_no_protected_seat(self):
+        # Step 15 round 5, R5-NB-2: statement collection from a
+        # context file reads the holding and involvement kinds
+        # and no other kind. A protected seat line in a context
+        # file supplies no protected seat, so a claimed family
+        # whose only protected seat stands in the context file
+        # takes NOT PROVEN in both holder variants, and no
+        # counted holder is excluded on facts stated there.
+        stagings = (
+            (1, "Re auditor seat for Round 1: holder %s.",
+             "Holding: fixer in Round 1, holder %s."),
+            (2, "Attacker seat at the break it step: holder %s.",
+             "Holding: build team seat, holder %s."),
+            (3, "First user seat: holder %s.",
+             "Holding: any prior seat, holder %s."),
+            (4, "Assessor seat for this stage: holder %s.",
+             "Involvement: producing, holder %s."),
+        )
+        for family, protected_form, holding_form in stagings:
+            for other in (22, 21):
+                with self.subTest(family=family, other=other):
+                    context = "# Context\n\n%s\n\n%s\n" % (
+                        protected_form % sid(21),
+                        holding_form % sid(other))
+                    res = self.run_with_context(
+                        self.claiming_roster(family), context)
+                    self.assert_rollup(res, "NOT PROVEN", 2)
+        context = "# Context\n\nFirst user seat: holder %s.\n\n" \
+                  "Holding: any prior seat, holder %s.\n" % (
+                      sid(1), sid(1))
+        res = self.run_with_context(self.claiming_roster(3), context)
+        self.assert_rollup(res, "NOT PROVEN", 2)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def test_context_protected_seat_line_alone_leaves_not_proven(self):
+        # R5-NB-2: a protected seat line alone in a context file,
+        # and a holding line alone, each leave the claimed family
+        # at NOT PROVEN, as the control with no context stands.
+        res = self.run_with_context(
+            self.claiming_roster(3),
+            "# Context\n\nFirst user seat: holder %s.\n" % sid(21))
+        self.assert_rollup(res, "NOT PROVEN", 2)
+        res = self.run_with_context(
+            self.claiming_roster(3),
+            "# Context\n\nHolding: any prior seat, holder %s.\n"
+            % sid(22))
+        self.assert_rollup(res, "NOT PROVEN", 2)
+
+    def test_legitimate_freshness_path_still_proves_its_verdicts(self):
+        # Control for R5-NB-2: the legitimate path keeps proving
+        # its verdicts. A roster protected seat beside a context
+        # holding with a different holder gives the family PASS,
+        # and a context holding that matches a roster protected
+        # seat still proves its FAIL.
+        roster = self.claiming_roster(
+            3, extra_lines=["First user seat: holder %s." % sid(21)])
+        res = self.run_with_context(
+            roster, "# Context\n\nHolding: any prior seat, holder "
+                    "%s.\n" % sid(22))
+        self.assert_rollup(res, "PASS", 0)
+        roster = self.claiming_roster(
+            1, extra_lines=["Re auditor seat for Round 1: holder %s."
+                            % sid(1)])
+        res = self.run_with_context(
+            roster, "# Context\n\nHolding: fixer in Round 1, holder "
+                    "%s.\n" % sid(1))
+        self.assert_rollup(res, "FAIL", 1)

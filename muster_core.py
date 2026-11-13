@@ -143,29 +143,114 @@ def _raw_holder_tokens(value):
 
 
 # Closed label forms, for the label limb of the full identifier
-# definition at brief Section 5.3. A value standing as a slot label
-# rather than an issued identifier stands in a label form where
-# every one of its tokens, as written, is one of: a single letter,
-# a digit token (a token with no letters), or one of the label
-# words below, and at least one of its tokens is a digit token.
-# Such a value names a slot, not a person: A 1, Seat 1, and
-# Holder 1 are its staged members. A complete name stands in no
-# label form, because a name carries a name word that is none of
-# those tokens: Holder Smith and Seat Jones keep counting on
-# their own form, as Fixture Name One does.
-_LABEL_WORDS = ("seat", "holder")
+# definition at brief Section 5.3, in the round 5 form. A value
+# standing as a slot label rather than an issued identifier is
+# judged on the shape of the value, in three limbs, and every
+# element of the rule stands enumerated here.
+#
+# Limb one, the digit limb, is pure shape and names no head word
+# at all: where any token of the value as written carries a
+# digit, the value stands in a label form, whether the digit
+# token stands apart (Seat 1), carries letters attached (Seat
+# 1a, Holder A1, Seat B2), or stands split by a separator, the
+# separator forms splitting into digit tokens under the raw
+# token rule above (Seat 1-2, Holder 1,000, Seat1). The ground
+# is the one the brief and the round 4 register state: no
+# complete name of a person carries a digit as one of its
+# words, so a digit bearing token bars the name form whatever
+# word heads it, with a head of one word or of more words, in
+# the singular or in the plural. A full session identifier is
+# judged before this limb and is untouched by it.
+#
+# Limb two, the spelled tail limb: a value stands in a label
+# form where its tail is a run of one or more spelled number
+# words from the cardinal or ordinal sets below, a compound
+# tail such as twenty one standing as one run, and every token
+# before that tail is a label head token. A label head token is
+# a single letter, one of the label head words below or its
+# plural formed by a trailing s, or one of the number markers
+# below. The label head words are the whole head element of
+# this limb: seat, holder, chair, member, agent, auditor,
+# reviewer, coordinator, captain, person, worker, judge, lead,
+# slot, position, and name. The number markers are no and
+# number.
+#
+# Limb three, the marker tail limb: a value whose last token
+# is one of the number markers, standing after label head
+# tokens alone, stands in a label form in that shape as well,
+# as in Seat No and Holder Number.
+#
+# The distinguishing ground between a label and a complete
+# name under limbs two and three is the head: a label head is
+# made of label head tokens alone, while a complete name
+# carries at least one word that is no label head token before
+# its spelled tail, if it carries one at all. Fixture Name One
+# counts on that ground: fixture is no label head token, so
+# the name stands in no label form, as Chosen One counts with
+# chosen as its head. A complete name with no digit token and
+# no spelled tail stands in no limb at all: Holder Smith, Seat
+# Jones, J Seat, and Mary Holder Smith keep counting.
+#
+# Stopping ground: this rule grows only when a charged act
+# adds a named element, a head word, a marker, or a spelled
+# number word, together with a test naming it. It does not
+# grow by probing or by synonymy.
+_LABEL_HEAD_WORDS = frozenset((
+    "seat", "holder", "chair", "member", "agent", "auditor",
+    "reviewer", "coordinator", "captain", "person", "worker",
+    "judge", "lead", "slot", "position", "name",
+))
+
+_LABEL_NUMBER_MARKERS = ("no", "number")
+
+_SPELLED_CARDINALS = frozenset((
+    "one", "two", "three", "four", "five", "six", "seven",
+    "eight", "nine", "ten", "eleven", "twelve", "thirteen",
+    "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+    "nineteen", "twenty", "thirty", "forty", "fifty", "sixty",
+    "seventy", "eighty", "ninety",
+))
+
+_SPELLED_ORDINALS = frozenset((
+    "first", "second", "third", "fourth", "fifth", "sixth",
+    "seventh", "eighth", "ninth", "tenth", "eleventh",
+    "twelfth", "thirteenth", "fourteenth", "fifteenth",
+    "sixteenth", "seventeenth", "eighteenth", "nineteenth",
+    "twentieth", "thirtieth", "fortieth", "fiftieth",
+    "sixtieth", "seventieth", "eightieth", "ninetieth",
+))
+
+_SPELLED_TAIL_WORDS = _SPELLED_CARDINALS | _SPELLED_ORDINALS
+
+
+def _is_label_head_token(token):
+    if len(token) == 1 and token.isalpha():
+        return True
+    if token in _LABEL_HEAD_WORDS:
+        return True
+    if token.endswith("s") and token[:-1] in _LABEL_HEAD_WORDS:
+        return True
+    return token in _LABEL_NUMBER_MARKERS
 
 
 def _is_label_holder(value):
     tokens = _raw_holder_tokens(value)
+    if not tokens:
+        return False
+    if any(any(ch.isdigit() for ch in token) for token in tokens):
+        return True
     if len(tokens) < 2:
         return False
-    if not any(token.isdigit() for token in tokens):
-        return False
-    return all(
-        len(token) == 1 or token.isdigit()
-        or token in _LABEL_WORDS
-        for token in tokens)
+    if tokens[-1] in _LABEL_NUMBER_MARKERS and all(
+            _is_label_head_token(token) for token in tokens[:-1]):
+        return True
+    cut = len(tokens)
+    while cut > 0 and tokens[cut - 1] in _SPELLED_TAIL_WORDS:
+        cut -= 1
+    if 0 < cut < len(tokens) and all(
+            _is_label_head_token(token) for token in tokens[:cut]):
+        return True
+    return False
 
 
 def _normalised_holder_tokens(value):
@@ -210,10 +295,12 @@ def is_identifier(value):
     placeholder forms: it refuses to count where the normalised
     whole value is a placeholder phrase in the closed phrase set,
     where a strong placeholder token such as tbd stands as one of
-    its tokens, where it stands in a closed label form (every
-    token as written a single letter, a digit token, or the label
-    word seat or holder, with a digit token standing in it, as in
-    A 1, Seat 1, or Holder 1), where it stands in the fragment
+    its tokens, where it stands in a closed label form (a digit
+    bearing token standing in it, as in A 1, Chair 1, or Seat
+    1a; or a spelled number or ordinal tail standing after label
+    head tokens alone, as in Seat one or Seat first; or a number
+    marker tail standing after label head tokens alone, as in
+    Seat No), where it stands in the fragment
     label form (the word fragment followed only by a single letter
     or by a token with no letters, as in fragment a or
     fragment 0000), or where
@@ -637,7 +724,14 @@ def _scan_statements(facts, captured, kind, text):
             # plan, seat total, appendix, or any other statement
             # from a context file is collected for any verdict,
             # comparison, rollup, printed result, or flag.
-            _scan_freshness(facts, line, source)
+            # The freshness kinds a context file carries are the
+            # holding and involvement kinds, round 5: the four
+            # protected seat forms are not a freshness kind, they
+            # are seats of the stage judged, and they are not read
+            # from a context file. A protected seat counts only
+            # from its governing sources, the judged stage records.
+            _scan_freshness(facts, line, source,
+                            include_protected=False)
             continue
         # Family C of round 3: base identifications and called for
         # values count only from their governing sources, the
@@ -785,7 +879,15 @@ def _scan_statements(facts, captured, kind, text):
             _scan_presentations(facts, line, source)
 
 
-def _scan_freshness(facts, line, source):
+def _scan_freshness(facts, line, source, include_protected=True):
+    # The holding and involvement kinds are read from every
+    # source that states them. The protected seat forms below
+    # them are read only where include_protected stands, which
+    # is every source except a context file: a context file
+    # supplies holding and involvement entries only, under the
+    # FreshnessContextRecord invariant at brief Section 5.3,
+    # whose entries never stand as seats and name no holder for
+    # the stage judged.
     match = re.match(r"Holding:\s*(.+?),\s*holder\s+(.+?)(?:,\s*round "
                      r"not stated)?\.?\s*$", line)
     if match:
@@ -803,6 +905,8 @@ def _scan_freshness(facts, line, source):
     if match:
         facts.involvements.append(
             (match.group(1).strip(), match.group(2).strip(), source))
+        return
+    if not include_protected:
         return
     match = re.match(r"Re auditor seat for (.+?):\s*holder\s+(.+?)"
                      r"\.?\s*$", line)
