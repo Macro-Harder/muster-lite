@@ -144,6 +144,21 @@ _PLACEHOLDER_COMPONENT_WORDS = frozenset(
     word for phrase in _PLACEHOLDER_PHRASES
     for word in phrase.split())
 
+# The set phrases read on the joined form of a value, with its
+# spaces removed, as the not recorded words are read: a phrase
+# refuses where a run of spaced single letters merges two or
+# more of its words into one token, because the whole value in
+# that joined form is the phrase itself, letter for letter, as
+# round 10 states the cure. The reading is whole value equality
+# only, in the round 9 form: a value carrying a phrase as part
+# of a longer whole stands outside it, exactly as its plain
+# counterpart stands. This set is the entries of
+# _PLACEHOLDER_PHRASES in that joined form, and the phrase set
+# itself gains no phrase from this round.
+_PLACEHOLDER_PHRASES_JOINED = frozenset(
+    re.sub(r"[^0-9a-z]+", "", phrase)
+    for phrase in _PLACEHOLDER_PHRASES)
+
 
 def _raw_holder_tokens(value):
     """The tokens of a holder value as written, before any joining
@@ -662,34 +677,65 @@ def _wholly_spaced_name_counts(value):
     return True
 
 
-# The mixed spaced run form, round 9. A run of spaced single
-# letters can also stand inside a holder value, beside an intact
-# word, and where that run spans two words of the value as
-# written it joins those two words into one token, in the same
-# crossing the round 8 form states for a wholly spaced run. Such
-# a joined token is judged on the same segmentation standard the
-# round 8 form applies to a wholly spaced run: a segmentation of
-# the joined token into enumerated vocabulary words of two
-# letters or more with at most one single letter piece among
-# them. Where a segmentation of that kind stands and the token
-# list it yields, standing in place of the joined token in the
-# value, stands as label tokens under the standing limbs in
-# _is_label_token_list, the value refuses exactly as its plain
-# counterpart refuses: Seat I D O N E refuses as Seat ID One
-# refuses, its joined token idone standing as id and one in the
-# token list seat, id, and one. Where no segmentation of that
-# kind yields label tokens, the joined token stands as a name
-# word on the standing grounds, as the joined token of Ida
-# S E A T is the one word seat standing beside a name, and the
-# joined token of Fixture I D O N E yields fixture, id, and one,
-# which stands in no limb on its outside word, exactly as its
-# plain counterpart counts. A token standing as written, not
-# joined from a run of at least two spaced single letters, is
-# never segmented by this form: a name word as written, as
-# idone would stand in Seat Idone, is one word of a name on its
-# face. The wholly spaced form above is untouched by this form:
-# a value standing wholly as one run still judges on that form
-# alone, and the round 8 drivings stand unchanged under it.
+# The mixed spaced run form, round 9, extended in round 10. A
+# run of spaced single letters can also stand inside a holder
+# value, beside an intact word, and where that run spans two
+# words of the value as written it joins those two words into
+# one token, in the same crossing the round 8 form states for a
+# wholly spaced run. Such a joined token is judged on the same
+# segmentation standard the round 8 form applies to a wholly
+# spaced run: a segmentation of the joined token into enumerated
+# vocabulary words of two letters or more with at most one
+# single letter piece among them. Where a segmentation of that
+# kind stands and the token list it yields, standing in place of
+# the joined token in the value, stands as label tokens under
+# the standing limbs in _is_label_token_list, the value refuses
+# exactly as its plain counterpart refuses: Seat I D O N E
+# refuses as Seat ID One refuses, its joined token idone
+# standing as id and one in the token list seat, id, and one.
+# Where no segmentation of that kind yields label tokens, the
+# joined token stands as a name word on the standing grounds, as
+# the joined token of Ida S E A T is the one word seat standing
+# beside a name, and the joined token of Fixture I D O N E yields
+# fixture, id, and one, which stands in no limb on its outside
+# word, exactly as its plain counterpart counts. A token
+# standing as written, not joined from a run of at least two
+# spaced single letters, is never segmented by this form: a name
+# word as written, as idone would stand in Seat Idone, is one
+# word of a name on its face. The wholly spaced form above is
+# untouched by this form: a value standing wholly as one run
+# still judges on that form alone, and the round 8 drivings
+# stand unchanged under it.
+#
+# Round 10 carries the same judgement to the three shapes the
+# round 9 form stopped short of, each judged whole, at the
+# readings the product already uses. First, a joined token is
+# also judged on segmentations with two single letter pieces
+# among them, the mixed analogue of the allowance the wholly
+# spaced bound records: Seat A O N E A refuses as Seat A One A
+# refuses, its joined token standing as a, one, and a. One
+# letter shape stands excepted from that two piece reading, on
+# the round 7 letter shape ground widened to the letters
+# standing in the run: a yielded token list made of single
+# letters beside exactly one word, and that word a label head
+# word standing as a surname, reads as initials beside a surname
+# and counts, as J J Seat and Seat J J count on their initials
+# beside the surname word, and as J Seat and Seat A count in
+# their two token shapes. Second, where a value carries two
+# merged runs, the runs are judged jointly: every joined token
+# of the value stands expanded, or standing as written, at the
+# same time, and a token list yielded by the joint expansion
+# stands judged by the same limbs, so two runs no longer shield
+# each other, as Seat I D O N E Holder C O D E T W O refuses on
+# the list seat, id, one, holder, code, and two. Third, a merged
+# token is read on the joined word closed reading,
+# _joined_word_is_closed, as a wholly spaced run is read: where
+# that reading reaches the merged token, as a strong placeholder
+# token standing at its head, the value refuses, as
+# T B D S M I T H Jones refuses on its merged token tbdsmith.
+# A merged token that stands in no closed form on that reading
+# keeps counting on the standing grounds, as J O N E S Smith
+# counts on its merged token jones.
 
 def _holder_tokens_and_run_lengths(value):
     """The normalised tokens of a holder value, with the length
@@ -725,15 +771,27 @@ def _joined_token_segmentations(word):
     vocabulary word, is no merging of two words and stands
     outside this form, so only segmentations of at least two
     pieces stand returned."""
+    return [pieces for pieces, _singles in
+            _joined_token_segmentations_upto(word, 1)]
+
+
+def _joined_token_segmentations_upto(word, max_singles):
+    """Every segmentation of a joined token into enumerated
+    vocabulary words of two letters or more with at most
+    max_singles single letter pieces among its pieces, each
+    standing returned with the number of single letter pieces it
+    carries. Segmentations of at least two pieces only, on the
+    ground stated at _joined_token_segmentations."""
     found = []
 
     def walk(position, singles, pieces):
         if position == len(word):
             if len(pieces) >= 2:
-                found.append(tuple(pieces))
+                found.append((tuple(pieces), singles))
             return
-        if singles == 0:
-            walk(position + 1, 1, pieces + [word[position]])
+        if singles < max_singles:
+            walk(position + 1, singles + 1,
+                 pieces + [word[position]])
         for candidate in _SEGMENT_WORDS:
             if word.startswith(candidate, position):
                 walk(position + len(candidate), singles,
@@ -743,24 +801,77 @@ def _joined_token_segmentations(word):
     return found
 
 
+def _two_piece_reading_excepted(expanded):
+    """Whether a token list yielded by a segmentation with two
+    single letter pieces stands in the excepted letter shape of
+    the round 10 passage: single letters beside exactly one
+    word, and that word a label head word standing as a surname,
+    as initials beside a surname stand."""
+    standing = [token for token in expanded
+                if not (len(token) == 1 and token.isalpha())]
+    return len(standing) == 1 and _is_label_head_word(standing[0])
+
+
 def _mixed_spaced_run_is_label(value):
     """Whether a holder value stands in a label form through a
-    run of spaced single letters inside it joining two of its
-    words into one token, on the form stated at the round 9
-    passage above."""
+    run of spaced single letters inside it joining two or more
+    of its words into one token, on the form stated at the
+    round 9 passage above as extended at the round 10 passage:
+    the joined tokens of the value judged jointly, each expanded
+    on its segmentations with at most two single letter pieces,
+    a yielded list standing in the excepted letter shape of the
+    two piece reading standing outside the refusal where the
+    two piece reading is the only reading that reaches it."""
     tokens, run_lengths = _holder_tokens_and_run_lengths(value)
     if len(tokens) < 2:
         return False
-    for index, (token, run_length) in enumerate(
-            zip(tokens, run_lengths)):
-        if run_length < 2:
+    options = []
+    for token, run_length in zip(tokens, run_lengths):
+        token_options = [((token,), 0)]
+        if run_length >= 2:
+            seen = set()
+            for pieces, singles in \
+                    _joined_token_segmentations_upto(token, 2):
+                if pieces in seen:
+                    continue
+                seen.add(pieces)
+                token_options.append((pieces, singles))
+        options.append(token_options)
+    partials = [((), False)]
+    for token_options in options:
+        widened = []
+        for expanded, used_two in partials:
+            for pieces, singles in token_options:
+                widened.append(
+                    (expanded + pieces, used_two or singles == 2))
+        seen = set()
+        partials = []
+        for item in widened:
+            if item not in seen:
+                seen.add(item)
+                partials.append(item)
+    for expanded, used_two in partials:
+        if not _is_label_token_list(list(expanded)):
             continue
-        for pieces in _joined_token_segmentations(token):
-            expanded = tokens[:index] + list(pieces) \
-                + tokens[index + 1:]
-            if _is_label_token_list(expanded):
-                return True
+        if used_two and _two_piece_reading_excepted(list(expanded)):
+            continue
+        return True
     return False
+
+
+def _mixed_spaced_run_is_closed(value):
+    """Whether a token joined from a run of spaced single
+    letters inside a holder value stands in a closed form on
+    the joined word closed reading, _joined_word_is_closed, as
+    a value standing wholly as one run is read on that reading:
+    the round 10 passage states the form. A token standing as
+    written is never read on its joined form by this reading."""
+    tokens, run_lengths = _holder_tokens_and_run_lengths(value)
+    if len(tokens) < 2:
+        return False
+    return any(
+        run_length >= 2 and _joined_word_is_closed(token)
+        for token, run_length in zip(tokens, run_lengths))
 
 
 def is_full_id(value):
@@ -826,7 +937,20 @@ def is_identifier(value):
     and the set phrases judge, so a spaced or part spaced form
     of a not recorded value refuses exactly as its plain form
     refuses, as N O T R E C O R D E D refuses as Not Recorded
-    refuses. A genuine complete name is judged the same way and
+    refuses. The set phrases judge on the joined form of the
+    whole value in the same way, so a run merging two or more
+    words of a phrase into one token refuses as its plain form
+    refuses, as To B E D E C I D E D refuses as To be decided
+    refuses, whole value equality only. A run inside a value
+    also judges on segmentations with two single letter pieces,
+    the letter shape of single letters beside one head word
+    standing as a surname excepted, and the runs of one value
+    judge jointly, as Seat A O N E A refuses and Seat
+    I D O N E Holder C O D E T W O refuses on the joint reading,
+    while J J Seat counts on the excepted shape; and a merged
+    token judges on the joined word closed reading as a wholly
+    spaced run judges, as T B D S M I T H Jones refuses on the
+    strong token at the head of its merged token. A genuine complete name is judged the same way and
     stands: a name that merely contains a phrase component word
     as one word among its own name words, such as Placeholder
     Smith or Pending Sutton, counts on its own form, and a
@@ -862,6 +986,15 @@ def is_identifier(value):
     if _is_label_holder(value):
         return False
     if " ".join(tokens) in _PLACEHOLDER_PHRASES:
+        return False
+    if re.sub(r"[^0-9a-z]+", "", lowered) \
+            in _PLACEHOLDER_PHRASES_JOINED:
+        # The set phrases judged on the joined form of the whole
+        # value, with its spaces removed, as the not recorded
+        # words are judged: a value whose run merges two or more
+        # words of a set phrase into one token refuses exactly as
+        # its plain form refuses, whole value equality only, as
+        # the round 10 passage at the joined forms set states.
         return False
     if any(token in _PLACEHOLDER_STRONG_TOKENS for token in tokens):
         return False
@@ -904,7 +1037,20 @@ def is_identifier(value):
         # round 9 passage: where the joined token so segments
         # and the token list it yields stands as label tokens
         # under the standing limbs, the value refuses exactly
-        # as its plain counterpart refuses.
+        # as its plain counterpart refuses. Round 10 carries
+        # that judgement to segmentations with two single letter
+        # pieces, the excepted letter shape standing outside it,
+        # and to the runs of a value judged jointly, as the
+        # round 10 passage states.
+        return False
+    if _mixed_spaced_run_is_closed(value):
+        # A token joined from a run of spaced single letters
+        # standing inside the value judges on the joined word
+        # closed reading as a wholly spaced run judges: where
+        # that reading reaches the merged token, as a strong
+        # placeholder token standing at its head, the value
+        # refuses exactly as its plain form refuses, as the
+        # round 10 passage states.
         return False
     return True
 

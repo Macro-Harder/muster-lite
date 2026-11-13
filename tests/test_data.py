@@ -2441,3 +2441,336 @@ class TestStep15Round9FixesData(MusterCase):
                       "T B D S M I T H", "F R A G M E N T A B"):
             with self.subTest(value=value):
                 self.assert_holder_refuses(value)
+
+
+class TestStep15Round10FixesData(MusterCase):
+    """Step 15 round 10 fix round tests: spaced forms judged
+    whole at every reading the product uses anywhere. A set
+    phrase refuses where a run merges two or more of its words;
+    a label refuses where the joined token segments only with
+    two single letter pieces, and where two merged runs in one
+    value are judged jointly; and a merged token refuses where
+    the joined word closed reading reaches it, as it reaches a
+    wholly spaced run."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def assert_holder_counts(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def assert_full_roster_refuses(self, holders):
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 0)
+
+    def assert_full_roster_counts(self, holders):
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def test_set_phrase_first_word_intact_merged_run_refuses_round10(self):
+        # Step 15 round 10, F1: every phrase of the closed set
+        # of 71 phrases that carries three or more words, 33
+        # phrases, standing with its first word intact beside a
+        # run spelling every remaining word joined as one token.
+        for value in (
+                      "Assignee T O B E N A M E D",
+                      "Assignment T O B E C O N F I R M E D",
+                      "Awaiting A D E C I S I O N",
+                      "Awaiting T H E A S S I G N M E N T",
+                      "Holder T O B E D E T E R M I N E D",
+                      "Name T O B E A N N O U N C E D",
+                      "Not A S S I G N E D Y E T",
+                      "Not Y E T A P P O I N T E D",
+                      "Not Y E T A S S I G N E D",
+                      "Not Y E T B E E N A S S I G N E D",
+                      "Not Y E T C O N F I R M E D", "Not Y E T K N O W N",
+                      "Pending A D E C I S I O N",
+                      "Pending F I N A L A P P R O V A L",
+                      "Seat T O B E F I L L E D", "Seat T O F I L L",
+                      "To B E A L L O C A T E D",
+                      "To B E A N N O U N C E D",
+                      "To B E A N N O U N C E D L A T E R",
+                      "To B E A P P O I N T E D", "To B E A S S I G N E D",
+                      "To B E C H O S E N", "To B E C O N F I R M E D",
+                      "To B E C O N F I R M E D L A T E R",
+                      "To B E D E C I D E D",
+                      "To B E D E C I D E D L A T E R",
+                      "To B E D E S I G N A T E D",
+                      "To B E D E T E R M I N E D", "To B E F I L L E D",
+                      "To B E F I L L E D L A T E R",
+                      "To B E F I N A L L Y D E C I D E D",
+                      "To B E S E L E C T E D",
+                      "Yet T O B E A S S I G N E D",):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_set_phrase_last_word_intact_merged_run_refuses_round10(self):
+        # F1, the second merged shape: a run spelling every word
+        # but the last joined as one token beside the last word
+        # standing intact, for the same 33 phrases.
+        for value in (
+                      "A S S I G N E E T O B E named",
+                      "A S S I G N M E N T T O B E confirmed",
+                      "A W A I T I N G A decision",
+                      "A W A I T I N G T H E assignment",
+                      "H O L D E R T O B E determined",
+                      "N A M E T O B E announced",
+                      "N O T A S S I G N E D yet", "N O T Y E T appointed",
+                      "N O T Y E T assigned",
+                      "N O T Y E T B E E N assigned",
+                      "N O T Y E T confirmed", "N O T Y E T known",
+                      "P E N D I N G A decision",
+                      "P E N D I N G F I N A L approval",
+                      "S E A T T O B E filled", "S E A T T O fill",
+                      "T O B E allocated", "T O B E announced",
+                      "T O B E A N N O U N C E D later",
+                      "T O B E appointed", "T O B E assigned",
+                      "T O B E chosen", "T O B E confirmed",
+                      "T O B E C O N F I R M E D later", "T O B E decided",
+                      "T O B E D E C I D E D later", "T O B E designated",
+                      "T O B E determined", "T O B E filled",
+                      "T O B E F I L L E D later",
+                      "T O B E F I N A L L Y decided", "T O B E selected",
+                      "Y E T T O B E assigned",):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_set_phrase_partial_merges_refuse_round10(self):
+        # F1, partial merges: the phrases of four or more words,
+        # 12 phrases, with the first and last words intact beside
+        # a run joining the middle words.
+        for value in (
+                      "Assignee T O B E named",
+                      "Assignment T O B E confirmed",
+                      "Holder T O B E determined",
+                      "Name T O B E announced",
+                      "Not Y E T B E E N assigned", "Seat T O B E filled",
+                      "To B E A N N O U N C E D later",
+                      "To B E C O N F I R M E D later",
+                      "To B E D E C I D E D later",
+                      "To B E F I L L E D later",
+                      "To B E F I N A L L Y decided",
+                      "Yet T O B E assigned",):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_set_phrase_breaker_values_and_rosters_refuse_round10(self):
+        # F1, the Breaker battery of round 10: seven set phrases
+        # in merged run form refuse, their full roster counts 0,
+        # and their plain forms and the plain forms of the
+        # Correctness specimens refuse beside them.
+        for value in ("To B E D E C I D E D",
+                      "Not Y E T A S S I G N E D",
+                      "Pending F I N A L A P P R O V A L",
+                      "Holder T O B E D E T E R M I N E D",
+                      "To Be D E C I D E D L A T E R",
+                      "Seat T O B E F I L L E D",
+                      "To B E D E T E R M I N E D"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("To B E D E C I D E D", "Not Y E T A S S I G N E D",
+             "Pending F I N A L A P P R O V A L"))
+        for value in ("To be decided", "Not assigned yet",
+                      "Pending final approval", "Not yet assigned",
+                      "To be determined", "To be decided later",
+                      "Pending approval", "Not yet known"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("To be decided", "Not assigned yet",
+             "Pending final approval"))
+
+    def test_set_phrase_genuine_values_count_round10(self):
+        # F1 genuine controls: a value carrying a set phrase as
+        # part of a longer whole counts as its plain counterpart
+        # counts, a value whose words merely contain phrase words
+        # as parts of longer words counts, and a merged run that
+        # spells phrase words beside a name word counts where the
+        # whole value stands in no phrase.
+        for value in ("To B E D E C I D E D Smith",
+                      "To be decided Smith",
+                      "Pending F I N A L A P P R O V A L Smith",
+                      "Smith B E D E C I D E D",
+                      "Smith Tobedecided", "Decidedly Smith",
+                      "Pendington Smith", "Assignment Smith Jones",
+                      "Holder Determined Smith", "Chosen One",
+                      "Placeholder Smith", "Pending Sutton"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_two_single_piece_label_values_refuse_round10(self):
+        # Step 15 round 10, F2: twelve label values whose joined
+        # token segments into label tokens only with two single
+        # letter pieces: a piece at each end of the joined token,
+        # two pieces at its tail or at both ends, and a run of
+        # exactly two spaced letters standing as two single
+        # letter words beside intact label words.
+        for value in ("Seat A O N E A", "Holder A T W O A",
+                      "Seat A F I R S T A", "Seat O N E A B",
+                      "Holder T W O A B", "Chair F I R S T A B",
+                      "A O N E B Seat", "B T W O A Holder",
+                      "Seat A B One", "Holder A B Two",
+                      "A B Seat One", "Seat One A B"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("Seat A O N E A", "Holder A T W O A", "Seat O N E A B"))
+        for value in ("Seat A One A", "Holder A Two A",
+                      "Seat A First A", "A One B Seat",
+                      "B Two A Holder"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_two_single_piece_genuine_values_count_round10(self):
+        # F2 genuine controls: the round 8 bound pair stands in
+        # its bound form, the round 7 letter shape exceptions
+        # count, two initials beside one surname word count in
+        # the shapes the round 9 pins stand in, and values whose
+        # two piece reading stands in no label form on their
+        # outside word count.
+        for value in ("A B O N E", "J Seat", "A Holder", "Seat A",
+                      "Holder A", "J J Seat", "Seat J J",
+                      "A B Seat", "Seat A B", "J J Holder",
+                      "Holder J J", "A B One Smith",
+                      "Fixture A O N E A", "Smith A O N E A"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+        self.assert_holder_refuses("I D A S E A T")
+
+    def test_two_merged_runs_label_values_refuse_round10(self):
+        # Step 15 round 10, F3: three pure label values carrying
+        # two merged runs in one value refuse when the runs are
+        # judged jointly, each run segmenting at the standing
+        # standard on its own; their plain counterparts refuse
+        # beside them and their full roster counts 0.
+        for value in ("Seat I D O N E Holder C O D E T W O",
+                      "I D O N E Seat C O D E T W O",
+                      "Holder C O D E N O Seat N O I D"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("Seat I D O N E Holder C O D E T W O",
+             "I D O N E Seat C O D E T W O",
+             "Holder C O D E N O Seat N O I D"))
+        for value in ("Seat ID One Holder Code Two",
+                      "ID One Seat Code Two",
+                      "Holder Code No Seat No ID"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_two_merged_runs_genuine_values_count_round10(self):
+        # F3 genuine controls: values with two runs that are not
+        # jointly a label form keep counting where they count
+        # today, on the words outside the label vocabulary.
+        for value in ("Fixture I D O N E Smith S E A T O N E",
+                      "Mary S M I T H John H O L D E R",
+                      "Smith J O N E S Bloggs S T O N E",
+                      "Fixture C O D E T W O Smith N O I D",
+                      "Smith I D O N E Jones C O D E T W O"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_merged_strong_token_values_refuse_round10(self):
+        # Step 15 round 10, F4: three values where a run merges
+        # a strong placeholder token with the following word
+        # beside an intact word refuse, the joined word closed
+        # reading reaching the merged token as it reaches a
+        # wholly spaced run; their plain forms and their wholly
+        # spaced forms refuse beside them.
+        for value in ("T B D S M I T H Jones", "T B C J O N E S Smith",
+                      "T B A H O L D E R Jones"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("T B D S M I T H Jones", "T B C J O N E S Smith",
+             "T B A H O L D E R Jones"))
+        for value in ("TBD Smith Jones", "TBC Jones Smith",
+                      "TBA Holder Jones", "T B D S M I T H",
+                      "T B C J O N E S", "T B A H O L D E R"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_merged_token_genuine_values_count_round10(self):
+        # F4 genuine controls: genuine values with a merged
+        # token that is no closed form keep counting, and tokens
+        # standing as written are never segmented or read on a
+        # joined form.
+        for value in ("J O N E S Smith", "S M I T H Jones",
+                      "Bloggs S T O N E", "Fixture T O N E S Smith",
+                      "Seat Idone", "Holder Idone", "Seat Codetwo",
+                      "Agent Numbera", "Seat Ida", "J S Smith",
+                      "Ida S E A T", "Fixture I D O N E",
+                      "Smith S E A T O N E", "Mary S M I T H",
+                      "J R Smith", "John S M I T H",
+                      "Mary H O L D E R", "John S E A T"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_round9_and_round8_drivings_unchanged_round10(self):
+        # The standing drivings the round 10 fix must keep: the
+        # ten round 9 charged merged run values refuse and their
+        # roster counts 0, the four round 9 not recorded variants
+        # refuse, and the round 8 spaced names count with their
+        # roster passing while the wholly spaced label forms
+        # refuse.
+        for value in ("Seat I D O N E", "Holder I D N O",
+                      "Seat C O D E T W O", "Holder C O D E N O",
+                      "ID S E A T O N E", "One S E A T I D",
+                      "Seat N O I D", "Member N O S E A T",
+                      "Seat N U M B E R A", "Agent C O D E A",
+                      "N O T R E C O R D E D", "N O I D R E C O R D E D",
+                      "Not R E C O R D E D", "No I D Recorded"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("Seat I D O N E", "Holder I D N O", "Seat C O D E T W O"))
+        for value in ("J S M I T H", "J S E A T", "A H O L D E R",
+                      "S E A T A", "H O L D E R A", "J O H N S M I T H"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+        self.assert_full_roster_counts(
+            ("J S M I T H", "J S E A T", "A H O L D E R"))
+        for value in ("S E A T", "C O D E", "S E A T I D",
+                      "S E A T O N E", "H O L D E R N U M B E R S"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
