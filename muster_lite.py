@@ -23,14 +23,15 @@ import muster_shell
 USAGE_OPTIONS = ("--stage", "--runner", "--capacity", "--context",
                  "--base-record", "--kind", "--fixture-fault")
 
-# Every character a line reader splits text on: newline, carriage
-# return, U+2028, U+2029, U+000B, U+000C, and U+0085. A printed value
-# carrying any of them could write a line of its own into an output,
-# so each one prints as a space in every printed value, on every
-# output path.
+# Every character a line reader splits text on: the closed
+# splitlines boundary set, newline, carriage return, U+000B,
+# U+000C, U+001C, U+001D, U+001E, U+0085, U+2028, and U+2029. A
+# printed value carrying any of them could write a line of its
+# own into an output, so each one prints as a space in every
+# printed value, on every output path.
 LINE_BREAK_CHARS = tuple(
     chr(code) for code in (0x0A, 0x0D, 0x2028, 0x2029, 0x0B, 0x0C,
-                           0x85))
+                           0x85, 0x1C, 0x1D, 0x1E))
 
 
 def _printed_value(value):

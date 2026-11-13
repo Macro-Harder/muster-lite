@@ -984,3 +984,233 @@ class TestStep15Round2PrinciplesCureData(MusterCase):
                       "Anyone One", "Somebody One", "Nobody One"):
             with self.subTest(value=value):
                 self.assert_holder_counts(value)
+
+
+class TestStep15Round3FixesData(MusterCase):
+    """Step 15 round 3 fix round tests: the placeholder battery,
+    context file governing statements, duplicate counting table
+    rows, and shipped data content validation."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def test_breaker_battery_placeholder_phrases_never_count(self):
+        # Step 15 round 3, R3-NB-1: the Breaker paper battery, its
+        # two groups of phrases standing outside the round 2 closed
+        # phrase set, each a placeholder on the face of the whole
+        # value under brief Section 5.3, never counts.
+        phrases = (
+            # Group 1, ordinary English dress of a charged or set
+            # phrase.
+            "Awaiting the assignment", "To be finally decided",
+            "Pending final approval", "Not yet been assigned",
+            "To be decided later", "To be announced later",
+            "To be filled later", "Seat unfilled",
+            "Seat to be filled", "Not yet appointed",
+            "Not yet confirmed", "Yet to be assigned",
+            "Holder to be determined", "Name to be announced",
+            "Assignment to be confirmed", "Awaiting a decision",
+            "Appointment pending", "Confirmation pending",
+            # Group 2, fresh noun and act words.
+            "Holder unknown", "Identity unknown", "Position vacant",
+            "Vacant position", "Unassigned holder", "No assignee",
+            "Empty seat", "Assignee to be named",
+            "Pending a decision", "Holder pending", "Role unfilled",
+            "Awaiting allocation", "Pending allocation",
+            "To be allocated",
+        )
+        self.assertEqual(len(phrases), 32)
+        for value in phrases:
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_breaker_battery_full_rosters_do_not_pass(self):
+        # Step 15 round 3, R3-NB-1: the Breaker paper two full
+        # rosters built from battery phrases alone name nobody and
+        # do not pass.
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        rosters = (
+            ("Holder unknown", "Seat unfilled", "To be decided later"),
+            ("Awaiting the assignment", "Pending final approval",
+             "Not yet appointed"),
+        )
+        for holders in rosters:
+            with self.subTest(holders=holders):
+                text = roster_text(
+                    teams=[("Audit team", None,
+                            [(role, holder, "counted in base")
+                             for role, holder in zip(roles, holders)])],
+                    board=self.BOARD)
+                res, _ = self.run_stage({"roster.md": text})
+                self.assert_report_present(res)
+                self.assertNotEqual(rollup_of(res), "PASS")
+                counts = {c["name"]: c
+                          for c in self.agentic(res)["counts"]}
+                self.assertEqual(
+                    counts["Audit team"]["counted_total"], 0)
+
+    def test_context_file_base_and_called_for_statements_do_not_govern(self):
+        # Step 15 round 3, C3-F2: a context file states freshness
+        # facts only. Its base identification and called for values
+        # move neither slot 4, nor the comparison, nor the rollup.
+        two = ("Pinned base: Fixture Base Two, hash %s, 999 bytes.\n"
+               % ("fedcba9876543210" * 4))
+        # A context only base statement does not rewrite slot 4:
+        # the run stands on the keyed base and passes.
+        res, _ = self.run_stage(
+            {"roster.md": simple_roster(),
+             "ctx.md": "# Context\n\n" + two},
+            context=["ctx.md"])
+        self.assert_rollup(res, "PASS", 0)
+        self.assertEqual(self.agentic(res)["pinned_base_name"],
+                         "Fixture Base One")
+        # A context called for version does not stand in slot 4
+        # and does not enter the comparison.
+        res, _ = self.run_stage(
+            {"roster.md": simple_roster(),
+             "base.md": base_record(),
+             "ctx.md": "# Context\n\nTable version the base calls "
+                       "for: 9.9.9-ctx.\n"},
+            context=["ctx.md"])
+        self.assert_rollup(res, "PASS", 0)
+        self.assertNotIn("9.9.9-ctx", res.stdout)
+        self.assert_in_stdout(
+            res, "Table version the base calls for: 1.0.0-fixture.")
+        # A context identification does not enter the distinct
+        # base list: the tier record identification governs alone.
+        tier_two = base_record().replace(
+            "Fixture Base One, hash %s, 12345"
+            % ("0123456789abcdef" * 4),
+            "Fixture Base Two, hash %s, 999"
+            % ("fedcba9876543210" * 4))
+        res, _ = self.run_stage(
+            {"roster.md": simple_roster(),
+             "tier.md": tier_two,
+             "ctx.md": "# Context\n\n" + (
+                 "Pinned base: Fixture Base One, hash %s, 12345 "
+                 "bytes.\n" % ("0123456789abcdef" * 4))},
+            context=["ctx.md"])
+        self.assertEqual(self.agentic(res)["pinned_base_name"],
+                         "Fixture Base Two")
+        self.assertNotIn("disagreement in the records identifying "
+                         "the base", res.stdout)
+
+    def staged_table_run(self, table, name="counting-table.json"):
+        import tempfile
+        from pathlib import Path
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        fixture = Path(tmp.name) / "table-variant.json"
+        fixture.write_text(json.dumps(table), encoding="utf-8")
+        return TestCountingTableAsData.run_with_data_file(
+            self, name, fixture)
+
+    def test_duplicate_rows_in_counting_table_take_tool_fault(self):
+        # Step 15 round 3, R3-NB-3: two rows for one step and team
+        # in any of the counting table row parts take the TOOL
+        # FAULT outcome, in both row orders, as duplicate keys do.
+        shipped = json.loads(
+            self.require_data_file("counting-table.json").read_text(
+                encoding="utf-8"))
+        row3 = {"minimum": 3, "step": 99, "team": "Audit team",
+                "team_count": 3}
+        row1 = {"minimum": 1, "step": 99, "team": "Audit team",
+                "team_count": 3}
+        variants = {}
+        first = json.loads(json.dumps(shipped))
+        first["per_step_rows"] = [row3, row1]
+        variants["per_step_rows minimum 3 then 1"] = first
+        second = json.loads(json.dumps(shipped))
+        second["per_step_rows"] = [row1, row3]
+        variants["per_step_rows minimum 1 then 3"] = second
+        variants["rows form duplicate rows"] = {
+            "table_version": "1.0.0-fixture",
+            "keyed_base": shipped["keyed_base"],
+            "rows": [row3, row1]}
+        for label, table in variants.items():
+            with self.subTest(variant=label):
+                res = self.staged_table_run(table)
+                self.assertEqual(res.returncode, 6)
+                self.assert_in_stdout(res, "TOOL FAULT")
+                self.assertIsNone(rollup_of(res))
+
+    def test_counting_table_list_contents_validated(self):
+        # Step 15 round 3, R3-NB-4 and C3-F6: the counting table
+        # list parts stand validated in content as in form. An
+        # empty list, a nonsense counting position, or a wrong
+        # kind value inside a list takes the TOOL FAULT outcome.
+        shipped = json.loads(
+            self.require_data_file("counting-table.json").read_text(
+                encoding="utf-8"))
+        variants = {}
+        for part in ("counting_positions", "carried_seats",
+                     "exempt_list", "pool_families"):
+            table = json.loads(json.dumps(shipped))
+            table[part] = []
+            variants["%s empty" % part] = table
+        table = json.loads(json.dumps(shipped))
+        table["counting_positions"] = ["counted in base"]
+        variants["counting_positions emptied in kind"] = table
+        table = json.loads(json.dumps(shipped))
+        table["counting_positions"] = ["nonsense", "words", "here",
+                                       "more", "junk"]
+        variants["counting_positions nonsense"] = table
+        table = json.loads(json.dumps(shipped))
+        table["carried_seats"] = [123, True]
+        variants["carried_seats wrong kind values"] = table
+        table = json.loads(json.dumps(shipped))
+        table["exempt_list"] = [{"kind": "object inside list"}]
+        variants["exempt_list object inside list"] = table
+        table = json.loads(json.dumps(shipped))
+        table["pool_families"] = [None, 7]
+        variants["pool_families wrong kind values"] = table
+        for label, table in variants.items():
+            with self.subTest(variant=label):
+                res = self.staged_table_run(table)
+                self.assertEqual(res.returncode, 6)
+                self.assert_in_stdout(res, "TOOL FAULT")
+                self.assertIsNone(rollup_of(res))
+
+    def test_catalogue_contents_validated(self):
+        # Step 15 round 3, R3-NB-4 and C3-F6: catalogue codes stand
+        # unique and rows complete in kind. A duplicated code, a
+        # code only row, and a one row catalogue take the TOOL
+        # FAULT outcome.
+        shipped = json.loads(
+            self.require_data_file(
+                "diagnostic-catalogue.json").read_text(
+                encoding="utf-8"))
+        variants = {}
+        duplicate = json.loads(json.dumps(shipped))
+        duplicate["rows"][1]["code"] = duplicate["rows"][0]["code"]
+        variants["duplicated catalogue code"] = duplicate
+        code_only = json.loads(json.dumps(shipped))
+        code_only["rows"][0] = {"code": "ML-01"}
+        variants["code only catalogue row"] = code_only
+        one_row = json.loads(json.dumps(shipped))
+        one_row["rows"] = one_row["rows"][:1]
+        variants["one row catalogue"] = one_row
+        for label, catalogue in variants.items():
+            with self.subTest(variant=label):
+                res = self.staged_table_run(
+                    catalogue, name="diagnostic-catalogue.json")
+                self.assertEqual(res.returncode, 6)
+                self.assert_in_stdout(res, "TOOL FAULT")
+                self.assertIsNone(rollup_of(res))

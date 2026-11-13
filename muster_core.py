@@ -108,6 +108,25 @@ _PLACEHOLDER_PHRASES = frozenset((
     "seat to fill", "to be selected", "to be chosen",
     "determination pending", "name unknown", "still pending",
     "unfilled seat", "unnamed holder",
+    # Phrases charged by the Step 15 round 3 Breaker paper battery
+    # (R3-NB-1), added as whole phrases by that charged act and
+    # named by the round 3 tests. The set remains closed on the
+    # stopping ground stated in the round 3 fix register: it grows
+    # only when a charged act adds a named phrase with a test
+    # naming it, never by probing or synonymy.
+    "awaiting the assignment", "to be finally decided",
+    "pending final approval", "not yet been assigned",
+    "to be decided later", "to be announced later",
+    "to be filled later", "seat unfilled", "seat to be filled",
+    "not yet appointed", "not yet confirmed",
+    "yet to be assigned", "holder to be determined",
+    "name to be announced", "assignment to be confirmed",
+    "awaiting a decision", "appointment pending",
+    "confirmation pending", "holder unknown", "identity unknown",
+    "position vacant", "vacant position", "unassigned holder",
+    "no assignee", "empty seat", "assignee to be named",
+    "pending a decision", "holder pending", "role unfilled",
+    "awaiting allocation", "pending allocation", "to be allocated",
 ))
 
 _PLACEHOLDER_COMPONENT_WORDS = frozenset(
@@ -299,6 +318,16 @@ def classify_file(captured):
     whose content is not a roster artifact.
     """
     groups = captured.groups
+    if captured.status == "read" and captured.text is not None \
+            and _is_spawn_export(captured.text):
+        # Family B of round 3: a spawn export is classified as an
+        # export by its form before any role classification, under
+        # every naming (supplied, context, base record, and any
+        # combination of them), as brief Section 2.2 item 1 states
+        # the ignore rule with no naming condition. Its contents
+        # therefore never supply a claim, a pinned base, a tier, or
+        # a board roster to a run, under any naming.
+        return "ignored"
     if groups == {"context"}:
         return "context"
     if "base" in groups:
@@ -541,19 +570,28 @@ def _scan_statements(facts, captured, kind, text):
     source = captured.display
     for raw_line in text.splitlines():
         line = raw_line.strip()
-        match = PINNED_BASE_LINE.search(line)
-        if match:
-            facts.base_ids.append(
-                (match.group(1).strip(), match.group(2),
-                 int(match.group(3)), source, kind))
-        match = CALLED_VERSION_LINE.search(line)
-        if match:
-            facts.called_versions.append((match.group(1).strip(),
-                                          source, kind))
-        match = CALLED_HASH_LINE.search(line)
-        if match:
-            facts.called_hashes.append((match.group(1).strip(),
-                                        source, kind))
+        # Family C of round 3: base identifications and called for
+        # values count only from their governing sources, the
+        # records that identify the base for the run. A context file
+        # states freshness facts only, so its statements of either
+        # kind are not collected here: they move neither slot 4,
+        # nor the comparison, nor the rollup. Its holding and
+        # involvement entries below still reach the freshness
+        # checks, as the brief provides.
+        if kind != "context":
+            match = PINNED_BASE_LINE.search(line)
+            if match:
+                facts.base_ids.append(
+                    (match.group(1).strip(), match.group(2),
+                     int(match.group(3)), source, kind))
+            match = CALLED_VERSION_LINE.search(line)
+            if match:
+                facts.called_versions.append((match.group(1).strip(),
+                                              source, kind))
+            match = CALLED_HASH_LINE.search(line)
+            if match:
+                facts.called_hashes.append((match.group(1).strip(),
+                                            source, kind))
         match = TIER_LINE.search(line)
         if match:
             facts.tier_statements.append(
@@ -1901,9 +1939,21 @@ def _inputs_read_in_manifest_order(files):
         if captured.display in seen:
             continue
         seen.add(captured.display)
-        keyed.append((_manifest_group_rank(kind), captured.display))
-    keyed.sort()
-    return [display for _rank, display in keyed]
+        keyed.append((_manifest_group_rank(kind), captured.named_path,
+                      captured.display))
+
+    def _read_compare(left, right):
+        if left[0] != right[0]:
+            return -1 if left[0] < right[0] else 1
+        return _path_compare(left[1], right[1])
+
+    keyed.sort(key=functools.cmp_to_key(_read_compare))
+    return [display for _rank, _path, display in keyed]
+
+
+def _canonical_sorted(names):
+    """Names in canonical order under the path part rule alone."""
+    return sorted(set(names), key=functools.cmp_to_key(_path_compare))
 
 
 # ----------------------------------------------------------------
@@ -2318,7 +2368,7 @@ def compute(files, table_data, catalogue_data, table_hash, params):
         "roster_evidence_only": roster_only,
         "standing_limits": ["coverage not applicable"]
             if coverage and coverage[-1]["total"] == 0 else [],
-        "context_files": sorted(
+        "context_files": _canonical_sorted(
             {captured.display for captured, kind in files
              if kind == "context" and captured.status == "read"
              and not captured.decode_failed}),
@@ -2332,18 +2382,18 @@ def compute(files, table_data, catalogue_data, table_hash, params):
         "claim_disagreements": disagreements,
         "record_defects": record_defects,
         "manifest_groups": {
-            "group 1": sorted(
+            "group 1": _canonical_sorted(
                 {captured.display for captured, kind in files
                  if captured.status == "read"
                  and not captured.decode_failed and kind in (
                      "roster", "step record", "tier record",
                      "base record")}),
-            "group 3": sorted(
+            "group 3": _canonical_sorted(
                 {captured.display for captured, kind in files
                  if captured.status == "read"
                  and not captured.decode_failed
                  and kind == "work product"}),
-            "group 4": sorted(
+            "group 4": _canonical_sorted(
                 {captured.display for captured, kind in files
                  if captured.status == "read"
                  and not captured.decode_failed and kind in (
@@ -2352,10 +2402,10 @@ def compute(files, table_data, catalogue_data, table_hash, params):
         },
         "truncated_files": sorted(facts.truncated_files),
         "inputs_read": _inputs_read_in_manifest_order(files),
-        "inputs_ignored": sorted(
+        "inputs_ignored": _canonical_sorted(
             {captured.display for captured, kind in files
              if kind == "ignored" and captured.status == "read"}),
-        "inputs_unread": sorted(
+        "inputs_unread": _canonical_sorted(
             {captured.display for captured, kind in files
              if captured.status != "read" or captured.decode_failed}),
         "seats": [seat.as_dict() for seat in facts.seats],

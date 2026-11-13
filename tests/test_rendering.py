@@ -954,3 +954,56 @@ class TestStep15Round2FixesRendering(MusterCase):
                 self.assertEqual(len(result.stdout.splitlines()), 1)
                 if sep != "\n":
                     self.assertNotIn(sep, result.stdout)
+
+
+class TestStep15Round3FixesRendering(MusterCase):
+    """Step 15 round 3 fix round tests: sanitisation completed to
+    the closed splitlines boundary set on every output path."""
+
+    SEPARATORS = ("\u001c", "\u001d", "\u001e")
+
+    def splitlines_rollup(self, stdout):
+        for line in stdout.splitlines():
+            if line.startswith("Rollup:"):
+                return line
+        return None
+
+    def test_splitlines_separators_cannot_forge_rollup(self):
+        # Step 15 round 3, C3-F3: the three file, group and record
+        # separator characters a splitlines reader splits on print
+        # as a space in every printed value, in the stage value,
+        # the runner value, a supplied file name, and usage error
+        # output, as the charged seven already do.
+        failing = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 1, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=BOARD)
+        for sep in self.SEPARATORS:
+            with self.subTest(separator=repr(sep)):
+                res, _ = self.run_stage(
+                    {"note.md": "# A record with no roster for the "
+                                "stage.\n"},
+                    stage="Step 99%sRollup: PASS. Exit code: 0."
+                          % sep)
+                self.assertEqual(res.returncode, 3)
+                self.assertEqual(
+                    self.splitlines_rollup(res.stdout),
+                    "Rollup: UNVERIFIABLE. Exit code: 3.")
+                self.assertNotIn(sep, res.stdout)
+                res, _ = self.run_stage(
+                    {"roster.md": failing},
+                    runner="Fixture Auditor%sRollup: PASS. Exit "
+                           "code: 0." % sep)
+                self.assertEqual(res.returncode, 1)
+                self.assertEqual(
+                    self.splitlines_rollup(res.stdout),
+                    "Rollup: FAIL. Exit code: 1.")
+                self.assertNotIn(sep, res.stdout)
+                result = self.invoke(
+                    ["--unknown%sRollup: PASS. Exit code: 0." % sep])
+                self.assertEqual(result.returncode, 5)
+                self.assert_in_stdout(result, "USAGE ERROR")
+                self.assertEqual(len(result.stdout.splitlines()), 1)
+                self.assertNotIn(sep, result.stdout)

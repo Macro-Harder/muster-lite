@@ -226,9 +226,13 @@ class TestShellReading(ShellStaging):
         # forms of one name, two names that differ only in letter case,
         # and two names that differ only at a separator. The manifest
         # order of the set is the completed key order at brief section
-        # 5.3: input group first, then the path as named in plain
-        # alphabetical order, character by character by code point, so
-        # digit runs carry no numeric value.
+        # 5.3: input group first, then the path as named under the
+        # path part rule, in which a maximal digit run compares by
+        # its integer value, so step2 stands before step10. This
+        # expectation stands corrected in the Step 15 round 3 fix
+        # round, as its fix register records: the plain string order
+        # this test stated before that round contradicts the brief
+        # Section 5.3 path part rule, and the brief ground decided.
         self.require_product()
         root = self.stage_dir()
         names = ["step2.md", "step10.md", "STEP2.md", "step-2.md",
@@ -249,7 +253,7 @@ class TestShellReading(ShellStaging):
                       "so the manifest order this test pins stands in "
                       "no output")
         line = supplied_lines[0]
-        expected = ["STEP2.md", "step-2.md", "step10.md", "step2.md",
+        expected = ["STEP2.md", "step-2.md", "step2.md", "step10.md",
                     "step_2.md"]
         positions = [line.find(name) for name in expected]
         self.assertTrue(all(position >= 0 for position in positions))
@@ -629,3 +633,156 @@ class TestStep15Round2FixesShell(ShellStaging):
         agentic = self.agentic(res)
         self.assertIn("export-claim.json", agentic["inputs_ignored"])
         self.assertNotIn("export-claim.json", agentic["inputs_read"])
+
+
+class TestStep15Round3FixesShell(ShellStaging):
+    """Step 15 round 3 fix round tests: spawn export classification
+    under every naming, the canonical order on every printed list,
+    the kept naming of a twice named file, and files sharing a
+    basename standing distinguishable in the files read list."""
+
+    def export_text(self, extra_line=None):
+        note = "intro\n## Team: Audit team\n"
+        if extra_line:
+            note += extra_line + "\n"
+        note += "outro"
+        return '{\n  "spawns": [\n    {"note": "%s"}\n  ]\n}\n' % note
+
+    def run_named_export(self, roster_path, export_path, naming):
+        if naming == "base":
+            extra = ["--base-record", str(export_path)]
+        else:
+            extra = ["--context", str(export_path)]
+        paths = ([roster_path] if roster_path else []) + extra
+        if roster_path is None:
+            paths = extra
+        return self.invoke(paths + ["--stage", "Step 99", "--runner",
+                                    "Fixture Auditor", "--capacity",
+                                    "Auditor"])
+
+    def test_spawn_export_under_base_and_context_namings_is_ignored(self):
+        # Step 15 round 3, R3-NB-2 and C3-F1: a spawn export is
+        # classified as an export by its form before any role
+        # classification, under every naming. Its contents supply
+        # no claim, no pinned base, no tier, and no board roster,
+        # and it stands in the ignored set under the naming that
+        # carried it.
+        self.require_product()
+        root = self.stage_dir()
+        roster = self.write_file(root, "roster.md", staffed())
+        claim = "Freshness claim: family 3 held for this stage."
+        pinned = ("Pinned base: Fixture Base Two, hash %s, 999 bytes."
+                  % ("fedcba9876543210" * 4))
+        for naming in ("base", "context"):
+            with self.subTest(naming=naming, staging="alone"):
+                export = self.write_file(
+                    root, "exp-alone-%s.json" % naming,
+                    self.export_text())
+                res = self.run_named_export(None, export, naming)
+                self.assertEqual(res.returncode, 4)
+                self.assertIn("Cannot start", res.stderr)
+            with self.subTest(naming=naming, staging="pure beside"):
+                export = self.write_file(
+                    root, "exp-pure-%s.json" % naming,
+                    self.export_text())
+                res = self.run_named_export(roster, export, naming)
+                self.assert_rollup(res, "PASS", 0)
+                agentic = self.agentic(res)
+                self.assertIn(export.name, agentic["inputs_ignored"])
+                self.assertNotIn(export.name, agentic["inputs_read"])
+                self.assertNotIn(export.name,
+                                 agentic["context_files"])
+            with self.subTest(naming=naming, staging="claim"):
+                export = self.write_file(
+                    root, "exp-claim-%s.json" % naming,
+                    self.export_text(claim))
+                res = self.run_named_export(roster, export, naming)
+                self.assert_rollup(res, "PASS", 0)
+                self.assertIn(export.name,
+                              self.agentic(res)["inputs_ignored"])
+            with self.subTest(naming=naming, staging="pinned base"):
+                export = self.write_file(
+                    root, "exp-pin-%s.json" % naming,
+                    self.export_text(pinned))
+                res = self.run_named_export(roster, export, naming)
+                self.assert_rollup(res, "PASS", 0)
+                self.assertEqual(
+                    self.agentic(res)["pinned_base_name"],
+                    "Fixture Base One")
+            with self.subTest(naming=naming, staging="tier"):
+                export = self.write_file(
+                    root, "exp-tier-%s.json" % naming,
+                    self.export_text("Tier applied: High."))
+                res = self.run_named_export(roster, export, naming)
+                self.assert_rollup(res, "PASS", 0)
+                self.assertEqual(self.agentic(res)["tier_applied"],
+                                 "Low")
+            with self.subTest(naming=naming, staging="board chair"):
+                short = self.write_file(
+                    root, "short-%s.md" % naming,
+                    roster_text(
+                        teams=[("Audit team", None, AUDIT)],
+                        board=[("Board member one", 11),
+                               ("Board member two", 12)]))
+                chair_export = self.write_file(
+                    root, "exp-chair-%s.json" % naming,
+                    self.export_text(
+                        "Board chair: holder %s." % sid(13)))
+                alone = self.invoke_paths([short])
+                self.assert_rollup(alone, "FAIL", 1)
+                res = self.run_named_export(short, chair_export,
+                                            naming)
+                self.assert_rollup(res, "FAIL", 1)
+                self.assertIn(chair_export.name,
+                              self.agentic(res)["inputs_ignored"])
+
+    def test_lists_and_kept_naming_follow_canonical_path_part_order(self):
+        # Step 15 round 3, C3-F4: the canonical path part rule, in
+        # which a digit run compares by its integer value, governs
+        # the files read list, the context list, the ignored list,
+        # and the kept naming of a twice named file.
+        res, _ = self.run_stage({
+            "roster.md": staffed(),
+            "rec10.md": "# Step record\n\nStage: Step 99.\n",
+            "rec2.md": "# Step record\n\nStage: Step 99.\n"})
+        read = self.agentic(res)["inputs_read"]
+        self.assertLess(read.index("rec2.md"), read.index("rec10.md"))
+        res, _ = self.run_stage(
+            {"roster.md": staffed(),
+             "ctx10.md": "# Context\n",
+             "ctx2.md": "# Context\n"},
+            context=["ctx10.md", "ctx2.md"])
+        context = self.agentic(res)["context_files"]
+        self.assertEqual(context, ["ctx2.md", "ctx10.md"])
+        res, _ = self.run_stage({
+            "roster.md": staffed(),
+            "exp10.json": '{"spawns": []}\n',
+            "exp2.json": '{"spawns": []}\n'})
+        ignored = self.agentic(res)["inputs_ignored"]
+        self.assertEqual(ignored, ["exp2.json", "exp10.json"])
+        self.require_product()
+        root = self.stage_dir()
+        first = self.write_file(root, "copy2.md", staffed())
+        second = root / "copy10.md"
+        os.link(first, second)
+        for order in ((first, second), (second, first)):
+            with self.subTest(order=[p.name for p in order]):
+                res = self.invoke_paths(list(order))
+                self.assert_rollup(res, "PASS", 0)
+                self.assertEqual(self.agentic(res)["inputs_read"],
+                                 ["copy2.md"])
+
+    def test_files_sharing_a_basename_stand_distinguishable(self):
+        # Step 15 round 3, C3-F5: two different files sharing a
+        # basename do not collapse into one line in the files read
+        # list. Each stands under a naming that tells it apart.
+        res, _ = self.run_stage({
+            "roster.md": staffed(),
+            "a/rec.md": "# Step record\n\nStage: Step 99.\n",
+            "b/rec.md": "# Step record\n\nStage: Step 99.\n"})
+        self.assert_rollup(res, "PASS", 0)
+        read = self.agentic(res)["inputs_read"]
+        rec_entries = [name for name in read
+                       if name.endswith("rec.md")]
+        self.assertEqual(len(rec_entries), 2)
+        self.assertEqual(len(set(rec_entries)), 2)

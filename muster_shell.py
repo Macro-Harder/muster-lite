@@ -11,6 +11,7 @@ the first of its namings under the completed key at brief
 Section 5.3.
 """
 
+import functools
 import hashlib
 import json
 import os
@@ -29,12 +30,14 @@ class CapturedFile(object):
         # The display name is printed into the fixed report lines, so
         # every line break character inside a file name is printed as
         # a space: a name can never write a line of its own into a
-        # report. The line break characters are newline, carriage
-        # return, U+2028, U+2029, U+000B, U+000C, and U+0085, every
+        # report. The line break characters are the closed splitlines
+        # boundary set: newline, carriage return, U+2028, U+2029,
+        # U+000B, U+000C, U+001C, U+001D, U+001E, and U+0085, every
         # character a line reader splits text on.
         self.display = os.path.basename(named_path)
         for break_char in ("\n", "\r", "\u2028", "\u2029",
-                           "\u000b", "\u000c", "\u0085"):
+                           "\u000b", "\u000c", "\u0085",
+                           "\u001c", "\u001d", "\u001e"):
             self.display = self.display.replace(break_char, " ")
         self.identity = None
         self.raw = None
@@ -59,6 +62,42 @@ def _decode(raw):
 _GROUP_RANK = {"supplied": 0, "base": 1, "context": 2}
 
 
+def _path_compare(left, right):
+    """Compare two paths as named, under the path part rule at
+    brief Section 5.3, in the same form the core carries: a maximal
+    run of ASCII digit characters compares by its integer value,
+    two runs of equal integer value compare in plain alphabetical
+    order, and every other character compares by its code point."""
+    li = 0
+    ri = 0
+    while li < len(left) and ri < len(right):
+        lc = left[li]
+        rc = right[ri]
+        if "0" <= lc <= "9" and "0" <= rc <= "9":
+            lj = li
+            while lj < len(left) and "0" <= left[lj] <= "9":
+                lj += 1
+            rj = ri
+            while rj < len(right) and "0" <= right[rj] <= "9":
+                rj += 1
+            lrun = left[li:lj]
+            rrun = right[ri:rj]
+            if int(lrun) != int(rrun):
+                return -1 if int(lrun) < int(rrun) else 1
+            if lrun != rrun:
+                return -1 if lrun < rrun else 1
+            li = lj
+            ri = rj
+            continue
+        if lc != rc:
+            return -1 if ord(lc) < ord(rc) else 1
+        li += 1
+        ri += 1
+    if li == len(left) and ri == len(right):
+        return 0
+    return -1 if li == len(left) else 1
+
+
 def _kept_naming(group_entries):
     """The naming of one file that the run keeps, under the key.
 
@@ -71,9 +110,15 @@ def _kept_naming(group_entries):
     is a property of the supplied set as a set, never of the order
     an operator named its files in.
     """
-    return min(group_entries,
-               key=lambda entry: (_GROUP_RANK.get(entry.group, 0),
-                                  entry.named_path))
+    def _naming_compare(left, right):
+        left_rank = _GROUP_RANK.get(left.group, 0)
+        right_rank = _GROUP_RANK.get(right.group, 0)
+        if left_rank != right_rank:
+            return -1 if left_rank < right_rank else 1
+        return _path_compare(left.named_path, right.named_path)
+
+    return sorted(group_entries,
+                  key=functools.cmp_to_key(_naming_compare))[0]
 
 
 def capture_inputs(named):
@@ -127,6 +172,25 @@ def capture_inputs(named):
         if kept.text is None:
             kept.decode_failed = True
         keep.append(kept)
+    # Family G of round 3: two different files sharing a basename
+    # do not collapse into one line in the files read list. Where
+    # captured files with different named paths share one display
+    # basename, each stands under the path as named for it, the
+    # brief Section 5.3 list form, with line break characters
+    # printed as spaces on the display rule above. A file whose
+    # basename stands alone keeps the basename display form.
+    by_display = {}
+    for entry in keep:
+        by_display.setdefault(entry.display, []).append(entry)
+    for _display, entries in by_display.items():
+        if len({entry.named_path for entry in entries}) > 1:
+            for entry in entries:
+                display = entry.named_path
+                for break_char in ("\n", "\r", "\u2028", "\u2029",
+                                   "\u000b", "\u000c", "\u0085",
+                                   "\u001c", "\u001d", "\u001e"):
+                    display = display.replace(break_char, " ")
+                entry.display = display
     return keep
 
 
@@ -234,6 +298,13 @@ def _validate_table_rows(rows, rows_key):
         if not _is_int(row.get("minimum")):
             raise DataFault("counting table row carries no minimum "
                             "as a number")
+    seen_keys = set()
+    for row in rows:
+        key = (row.get("step"), row.get("team"))
+        if key in seen_keys:
+            raise DataFault("counting table %s carries two rows "
+                            "for one step and team" % rows_key)
+        seen_keys.add(key)
 
 
 def _validate_table_totals(totals, totals_key, non_empty):
@@ -301,10 +372,32 @@ def _validate_counting_table(data):
                                non_empty=True)
         _validate_table_totals(data["board_additions"],
                                "board_additions", non_empty=True)
-        for list_key in ("counting_positions", "carried_seats",
-                         "exempt_list", "pool_families"):
-            if not isinstance(data[list_key], list):
-                raise DataFault("counting table %s is not a list"
+        positions = data["counting_positions"]
+        if not isinstance(positions, list) or \
+                len(positions) != 5 or set(positions) != {
+                    "counted in base", "over base at team level",
+                    "uncounted at this step", "board additional",
+                    "exempt"}:
+            raise DataFault("counting table counting_positions "
+                            "does not stand as the five positions")
+        carried = data["carried_seats"]
+        if not isinstance(carried, list) or not carried:
+            raise DataFault("counting table carried_seats is not "
+                            "a non empty list")
+        for entry in carried:
+            if not isinstance(entry, dict) or any(
+                    not isinstance(entry.get(field), str)
+                    or not entry[field]
+                    for field in ("kind", "position", "teams")):
+                raise DataFault("counting table carried_seats "
+                                "entry does not stand in its form")
+        for list_key in ("exempt_list", "pool_families"):
+            values = data[list_key]
+            if not isinstance(values, list) or not values or any(
+                    not isinstance(value, str) or not value
+                    for value in values):
+                raise DataFault("counting table %s does not stand "
+                                "as a non empty list of strings"
                                 % list_key)
         if "rows" in data:
             _validate_table_rows(data["rows"], "rows")
@@ -342,13 +435,26 @@ def _validate_diagnostic_catalogue(data):
     if not isinstance(rows, list) or not rows:
         raise DataFault("diagnostic catalogue rows is not a non "
                         "empty list")
+    codes = []
     for row in rows:
         if not isinstance(row, dict):
             raise DataFault("diagnostic catalogue row is not an "
                             "object")
-        if not isinstance(row.get("code"), str) or not row["code"]:
-            raise DataFault("diagnostic catalogue row carries no "
-                            "code as a string")
+        if set(row.keys()) != {"code", "kind", "shape",
+                               "rule_reference"} or any(
+                not isinstance(row.get(field), str)
+                or not row[field]
+                for field in ("code", "kind", "shape",
+                              "rule_reference")):
+            raise DataFault("diagnostic catalogue row does not "
+                            "carry its four things as strings")
+        codes.append(row["code"])
+    if len(codes) != len(set(codes)):
+        raise DataFault("diagnostic catalogue carries a code "
+                        "more than once")
+    if set(codes) != {"ML-%02d" % number for number in range(1, 31)}:
+        raise DataFault("diagnostic catalogue rows do not stand "
+                        "as the shipped row set")
 
 
 def load_data_file(entry_dir, name):
