@@ -275,13 +275,19 @@ def _validate_team_bases(bases):
                 "or a band" % (team, tier))
 
 
-def _validate_table_rows(rows, rows_key):
+def _validate_table_rows(rows, rows_key, seen_keys=None):
     """Every row, in every rows form, carries its whole form.
 
     The counting reads the minimum inside every row, so a row with
     no minimum, no step, or no team is damage in the shipped form
     and in the minimal rows form alike, and an empty rows list
     carries no rule at all.
+
+    The duplicate check reads the row parts as one row set: a
+    caller validating more than one part of one table passes the
+    same seen set to each part, so a step and team standing in
+    two parts faults exactly as a step and team standing twice
+    in one part does.
     """
     if not isinstance(rows, list) or not rows:
         raise DataFault("counting table %s is not a non empty list"
@@ -298,7 +304,8 @@ def _validate_table_rows(rows, rows_key):
         if not _is_int(row.get("minimum")):
             raise DataFault("counting table row carries no minimum "
                             "as a number")
-    seen_keys = set()
+    if seen_keys is None:
+        seen_keys = set()
     for row in rows:
         key = (row.get("step"), row.get("team"))
         if key in seen_keys:
@@ -366,7 +373,9 @@ def _validate_counting_table(data):
                 raise DataFault("counting table in the shipped form "
                                 "is missing its %s part" % part)
         _validate_team_bases(data["team_bases"])
-        _validate_table_rows(data["per_step_rows"], "per_step_rows")
+        row_keys = set()
+        _validate_table_rows(data["per_step_rows"], "per_step_rows",
+                             row_keys)
         _validate_keyed_base(data["keyed_base"])
         _validate_table_totals(data["step_totals"], "step_totals",
                                non_empty=True)
@@ -400,7 +409,7 @@ def _validate_counting_table(data):
                                 "as a non empty list of strings"
                                 % list_key)
         if "rows" in data:
-            _validate_table_rows(data["rows"], "rows")
+            _validate_table_rows(data["rows"], "rows", row_keys)
     else:
         if "rows" not in data:
             raise DataFault("counting table carries no rows in any "

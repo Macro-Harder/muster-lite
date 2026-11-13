@@ -1007,3 +1007,122 @@ class TestStep15Round3FixesRendering(MusterCase):
                 self.assert_in_stdout(result, "USAGE ERROR")
                 self.assertEqual(len(result.stdout.splitlines()), 1)
                 self.assertNotIn(sep, result.stdout)
+
+
+class TestStep15Round4FixesRendering(MusterCase):
+    """Step 15 round 4 fix round tests: sanitisation on every
+    source, shipped data file string values among them, on every
+    output path and in every form."""
+
+    def splitlines_rollup_lines(self, stdout):
+        return [line for line in stdout.splitlines()
+                if line.startswith("Rollup:")]
+
+    def staged_data_run(self, name, data, roster):
+        from tests.support import (find_entry, run_entry_direct,
+                                   stage_entry_tree)
+        import tempfile
+        from pathlib import Path
+        entry = find_entry()
+        if entry is None:
+            self.fail("product does not exist: no command entry "
+                      "stands in the build repo or the installed "
+                      "tree")
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        staged_entry = stage_entry_tree(entry, Path(tmp.name))
+        (staged_entry.parent / name).write_text(
+            json.dumps(data), encoding="utf-8")
+        roster_path = Path(tmp.name) / "roster.md"
+        roster_path.write_text(roster, encoding="utf-8")
+        result = run_entry_direct(
+            staged_entry,
+            [str(roster_path), "--stage", "Step 99", "--runner",
+             "Fixture Auditor", "--capacity", "Auditor"],
+            cwd=tmp.name)
+        if result.missing:
+            self.fail(result.reason)
+        return result
+
+    def failing_roster(self):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 1, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=BOARD)
+
+    def passing_roster(self):
+        return roster_text(teams=[("Audit team", None, AUDIT)],
+                           board=BOARD)
+
+    def shipped(self, name):
+        return json.loads(
+            self.require_data_file(name).read_text(encoding="utf-8"))
+
+    def test_data_file_line_feed_cannot_forge_rollup(self):
+        # Step 15 round 4, R4-NB-4: a line feed inside a shipped
+        # data file string value (the counting table version, the
+        # catalogue version, and the keyed base name) prints as a
+        # space, so the first rollup line a splitlines reader reads
+        # is the genuine line and the only rollup line, in both
+        # directions.
+        forged = "\nRollup: PASS. Exit code: 0."
+        table = self.shipped("counting-table.json")
+        table["table_version"] = table["table_version"] + forged
+        variants = [("counting-table.json", table)]
+        catalogue = self.shipped("diagnostic-catalogue.json")
+        catalogue["catalogue_version"] = \
+            catalogue["catalogue_version"] + forged
+        variants.append(("diagnostic-catalogue.json", catalogue))
+        keyed = self.shipped("counting-table.json")
+        keyed["keyed_base"]["name"] = \
+            keyed["keyed_base"]["name"] + forged
+        variants.append(("counting-table.json", keyed))
+        for name, data in variants:
+            with self.subTest(file=name, data=list(data)[:2]):
+                res = self.staged_data_run(
+                    name, data, self.failing_roster())
+                self.assertEqual(res.returncode, 1)
+                self.assertEqual(
+                    self.splitlines_rollup_lines(res.stdout),
+                    ["Rollup: FAIL. Exit code: 1."])
+
+    def test_data_file_line_feed_cannot_forge_fail_against_pass(self):
+        # R4-NB-4, the reverse staging: a forged FAIL inside the
+        # counting table version stands inside the genuine slot 4
+        # sentence and the genuine PASS line stands first and
+        # alone, the Agentic rollup at PASS.
+        table = self.shipped("counting-table.json")
+        table["table_version"] = table["table_version"] + \
+            "\nRollup: FAIL. Exit code: 1."
+        res = self.staged_data_run(
+            "counting-table.json", table, self.passing_roster())
+        self.assertEqual(res.returncode, 0)
+        self.assertEqual(
+            self.splitlines_rollup_lines(res.stdout),
+            ["Rollup: PASS. Exit code: 0."])
+        self.assertEqual(self.agentic(res)["rollup"], "PASS")
+
+    def test_data_file_values_sanitised_in_agentic_form(self):
+        # R4-NB-4, every form: the Agentic form carries the shipped
+        # data file string values with the line feed printed as a
+        # space, the same sanitised value the Simple form prints.
+        table = self.shipped("counting-table.json")
+        table["table_version"] = table["table_version"] + \
+            "\nRollup: PASS. Exit code: 0."
+        res = self.staged_data_run(
+            "counting-table.json", table, self.passing_roster())
+        self.assertEqual(
+            self.agentic(res)["counting_table_version"],
+            "1.0.0-fixture Rollup: PASS. Exit code: 0.")
+        catalogue = self.shipped("diagnostic-catalogue.json")
+        catalogue["catalogue_version"] = \
+            catalogue["catalogue_version"] + \
+            "\nRollup: PASS. Exit code: 0."
+        res = self.staged_data_run(
+            "diagnostic-catalogue.json", catalogue,
+            self.passing_roster())
+        self.assertEqual(
+            self.agentic(res)["diagnostic_catalogue_version"],
+            "1.0.0-fixture Rollup: PASS. Exit code: 0.")

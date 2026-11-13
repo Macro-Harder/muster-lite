@@ -134,6 +134,40 @@ _PLACEHOLDER_COMPONENT_WORDS = frozenset(
     for word in phrase.split())
 
 
+def _raw_holder_tokens(value):
+    """The tokens of a holder value as written, before any joining
+    normalisation: lowercased, with every punctuation and spacing
+    character turned into a space, and no letters joined."""
+    text = re.sub(r"[^0-9a-z]+", " ", value.lower())
+    return text.split()
+
+
+# Closed label forms, for the label limb of the full identifier
+# definition at brief Section 5.3. A value standing as a slot label
+# rather than an issued identifier stands in a label form where
+# every one of its tokens, as written, is one of: a single letter,
+# a digit token (a token with no letters), or one of the label
+# words below, and at least one of its tokens is a digit token.
+# Such a value names a slot, not a person: A 1, Seat 1, and
+# Holder 1 are its staged members. A complete name stands in no
+# label form, because a name carries a name word that is none of
+# those tokens: Holder Smith and Seat Jones keep counting on
+# their own form, as Fixture Name One does.
+_LABEL_WORDS = ("seat", "holder")
+
+
+def _is_label_holder(value):
+    tokens = _raw_holder_tokens(value)
+    if len(tokens) < 2:
+        return False
+    if not any(token.isdigit() for token in tokens):
+        return False
+    return all(
+        len(token) == 1 or token.isdigit()
+        or token in _LABEL_WORDS
+        for token in tokens)
+
+
 def _normalised_holder_tokens(value):
     """The tokens of a holder value under the whole value rule."""
     text = re.sub(r"[^0-9a-z]+", " ", value.lower())
@@ -176,9 +210,13 @@ def is_identifier(value):
     placeholder forms: it refuses to count where the normalised
     whole value is a placeholder phrase in the closed phrase set,
     where a strong placeholder token such as tbd stands as one of
-    its tokens, where it stands in the fragment label form (the
-    word fragment followed only by a single letter or by a token
-    with no letters, as in fragment a or fragment 0000), or where
+    its tokens, where it stands in a closed label form (every
+    token as written a single letter, a digit token, or the label
+    word seat or holder, with a digit token standing in it, as in
+    A 1, Seat 1, or Holder 1), where it stands in the fragment
+    label form (the word fragment followed only by a single letter
+    or by a token with no letters, as in fragment a or
+    fragment 0000), or where
     it repeats one component word of the phrase set, as in Unknown
     Unknown. A genuine complete name is judged the same way and
     stands: a name that merely contains a phrase component word
@@ -203,6 +241,8 @@ def is_identifier(value):
     tokens = _normalised_holder_tokens(value)
     if not tokens:
         return False
+    if _is_label_holder(value):
+        return False
     if " ".join(tokens) in _PLACEHOLDER_PHRASES:
         return False
     if any(token in _PLACEHOLDER_STRONG_TOKENS for token in tokens):
@@ -211,6 +251,21 @@ def is_identifier(value):
     if tokens[0] == "fragment" and len(tokens) >= 2 and all(
             len(token) == 1 or not token.isalpha()
             for token in tokens[1:]):
+        return False
+    # The fragment label form judged as written, round 4: the
+    # judgement applies to the value components as written, before
+    # any joining normalisation, so Fragment followed by single
+    # letters in any count (Fragment A B, Fragment A B C) stands in
+    # the fragment label form, where the joining step above would
+    # spell the letters into one token and hide the form. A token
+    # with letters standing beside the word fragment, as in
+    # Fragment Jones or Fragment AB, stands in neither form and
+    # keeps counting on its own form.
+    raw_tokens = _raw_holder_tokens(value)
+    if raw_tokens and raw_tokens[0] == "fragment" \
+            and len(raw_tokens) >= 2 and all(
+                len(token) == 1 or token.isdigit()
+                for token in raw_tokens[1:]):
         return False
     if len(alpha_tokens) >= 2 and len(set(alpha_tokens)) == 1 \
             and alpha_tokens[0] in _PLACEHOLDER_COMPONENT_WORDS:
@@ -570,6 +625,20 @@ def _scan_statements(facts, captured, kind, text):
     source = captured.display
     for raw_line in text.splitlines():
         line = raw_line.strip()
+        if kind == "context":
+            # The context rule in its general form, round 4: a
+            # context file contributes freshness statements only,
+            # under brief Sections 5.2 and 5.7 and the
+            # FreshnessContextRecord shape at Section 5.3, whose
+            # entries are facts for the freshness checks only.
+            # Statement collection from a context file therefore
+            # reads the freshness kinds and no other kind: no tier,
+            # stage, board, chosen size, exempt, defective, claim,
+            # plan, seat total, appendix, or any other statement
+            # from a context file is collected for any verdict,
+            # comparison, rollup, printed result, or flag.
+            _scan_freshness(facts, line, source)
+            continue
         # Family C of round 3: base identifications and called for
         # values count only from their governing sources, the
         # records that identify the base for the run. A context file
@@ -1175,17 +1244,46 @@ def _parse_seat_line(facts, line, team, round_key, source):
 # Shipped data, normalised
 
 
+# Every character a line reader splits text on: the closed
+# splitlines boundary set. A shipped data file string value can
+# carry any of them as a JSON escape, and no record reading stands
+# between such a value and the report, so every string value the
+# shipped data supplies to the report is sanitised here, at the
+# point the core takes the data in: each splitlines character
+# prints as a space, on every output path and in every form, as
+# invocation values, file names, and record contents already are
+# at their own sources.
+_SPLITLINES_CHARS = tuple(
+    chr(code) for code in (0x0A, 0x0D, 0x2028, 0x2029, 0x0B, 0x0C,
+                           0x85, 0x1C, 0x1D, 0x1E))
+
+
+def _sanitised_data_value(value):
+    if not isinstance(value, str):
+        return value
+    for break_char in _SPLITLINES_CHARS:
+        value = value.replace(break_char, " ")
+    return value
+
+
 class Table(object):
     def __init__(self, data):
-        self.version = data.get("table_version")
-        self.keyed_base = data.get("keyed_base")
+        self.version = _sanitised_data_value(data.get("table_version"))
+        keyed = data.get("keyed_base")
+        if isinstance(keyed, dict):
+            keyed = {field: _sanitised_data_value(value)
+                     for field, value in keyed.items()}
+        self.keyed_base = keyed
         self.rows = {}
         self.required = {}
         for row in data.get("per_step_rows", []) or []:
             self._add_row(row)
         for row in data.get("rows", []) or []:
             self._add_row(row)
-        self.team_bases = data.get("team_bases", {}) or {}
+        self.team_bases = {
+            _sanitised_data_value(team): tiers
+            for team, tiers in
+            (data.get("team_bases", {}) or {}).items()}
         self.step_totals = {}
         for key, value in (data.get("step_totals", {}) or {}).items():
             self.step_totals[int(key)] = value
@@ -1202,6 +1300,7 @@ class Table(object):
         team = row.get("team")
         if team is None:
             return
+        team = _sanitised_data_value(team)
         self.rows[(step, team)] = row
         self.required.setdefault(step, []).append(team)
 
@@ -1233,7 +1332,8 @@ class Table(object):
 
 class Catalogue(object):
     def __init__(self, data):
-        self.version = data.get("catalogue_version")
+        self.version = _sanitised_data_value(
+            data.get("catalogue_version"))
         self.rows = data.get("rows", []) or []
 
 

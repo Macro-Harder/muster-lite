@@ -837,6 +837,7 @@ class TestStep15Round2FixesData(MusterCase):
                 self.assert_in_stdout(res, "TOOL FAULT")
                 self.assertIsNone(rollup_of(res))
 
+
     def test_identification_sentences_follow_manifest_order(self):
         # Step 15 round 2, C2-F3: Identification sentences print in
         # the canonical manifest order of the records that identify
@@ -1214,3 +1215,384 @@ class TestStep15Round3FixesData(MusterCase):
                 self.assertEqual(res.returncode, 6)
                 self.assert_in_stdout(res, "TOOL FAULT")
                 self.assertIsNone(rollup_of(res))
+
+
+class TestStep15Round4FixesData(MusterCase):
+    """Step 15 round 4 fix round tests: label holders, the general
+    context rule, the fragment label form as written, and duplicate
+    counting table rows across the two row parts."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def assert_holder_counts(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def test_label_holders_never_count(self):
+        # Step 15 round 4, R4-NB-3: a value standing as a slot label
+        # rather than an issued identifier never counts as a full
+        # identifier. The staged label forms are a single letter and
+        # a digit, Seat and a digit, and Holder and a digit, with
+        # the further members of their class: a multi digit number
+        # after the label, and label tokens standing together with
+        # single letters and digits and no name word at all.
+        for value in ("A 1", "B 2", "Z 9", "A 12", "Seat 1",
+                      "Seat 2", "Seat 12", "Holder 1", "Holder 3",
+                      "Holder 007", "Seat A 1"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_label_holder_full_rosters_do_not_pass(self):
+        # Step 15 round 4, R4-NB-3: full rosters held by label
+        # values alone name nobody and do not pass, and one label
+        # value beside two session identifiers does not count.
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        rosters = (
+            ("A 1", "B 2", "C 3"),
+            ("Seat 1", "Seat 2", "Seat 3"),
+            ("Holder 1", "Holder 2", "Holder 3"),
+        )
+        for holders in rosters:
+            with self.subTest(holders=holders):
+                text = roster_text(
+                    teams=[("Audit team", None,
+                            [(role, holder, "counted in base")
+                             for role, holder in zip(roles, holders)])],
+                    board=self.BOARD)
+                res, _ = self.run_stage({"roster.md": text})
+                self.assert_report_present(res)
+                self.assertNotEqual(rollup_of(res), "PASS")
+                counts = {c["name"]: c
+                          for c in self.agentic(res)["counts"]}
+                self.assertEqual(
+                    counts["Audit team"]["counted_total"], 0)
+        self.assert_holder_refuses("A 1")
+
+    def test_genuine_names_still_count_beside_label_rule(self):
+        # Control for R4-NB-3: a complete name in the issued name
+        # form, and a name carrying a label word as one word of a
+        # complete name, stand in no label form and keep counting.
+        for value in ("Fixture Name One", "Holder Smith",
+                      "Seat Jones"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_fragment_label_multi_letter_forms_never_count(self):
+        # Step 15 round 4, R4-NB-1: the fragment label form is
+        # judged on the value components as written, before any
+        # joining normalisation. Fragment followed by single
+        # letters in any count stands in the fragment label form
+        # and refuses, as the single component forms already do.
+        for value in ("Fragment A B", "Fragment A B C",
+                      "Fragment A B C D", "fragment a b"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_fragment_label_single_component_forms_still_refuse(self):
+        # R4-NB-1 controls: the single component fragment forms
+        # that refused in every round keep refusing.
+        for value in ("Fragment A", "fragment b", "Fragment 7",
+                      "Fragment 12", "fragment 0000", "Fragment A 0",
+                      "Fragment 0 A"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_fragment_label_full_roster_does_not_pass(self):
+        # R4-NB-1: a full roster held by fragment labels names
+        # nobody and does not pass.
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        holders = ("Fragment A B", "Fragment C D", "Fragment E F")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 0)
+
+    def test_names_outside_fragment_label_form_still_count(self):
+        # R4-NB-1 controls: genuine names caught by neither form
+        # keep counting. Fragment AB stands as the Fragment Jones
+        # shape, one token with letters beside the word fragment,
+        # and counts as a complete name on its own form.
+        for value in ("Fragment Jones", "Fragment AB",
+                      "Fixture Name One"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def run_with_context(self, roster, context_text):
+        return self.run_stage(
+            {"roster.md": roster, "ctx.md": context_text},
+            context=["ctx.md"])[0]
+
+    def staged_table_run(self, table, name="counting-table.json"):
+        import tempfile
+        from pathlib import Path
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        fixture = Path(tmp.name) / "table-variant.json"
+        fixture.write_text(json.dumps(table), encoding="utf-8")
+        return TestCountingTableAsData.run_with_data_file(
+            self, name, fixture)
+
+    def test_duplicate_rows_across_table_parts_take_tool_fault(self):
+        # Step 15 round 4, R4-NB-5 and C4-F3: the two row parts of
+        # the counting table are validated as one row set. A step
+        # and team standing in both per_step_rows and rows takes
+        # the TOOL FAULT outcome, as duplicates within a part
+        # already do, whichever minimum each part states and also
+        # where both parts state the same minimum.
+        shipped = json.loads(
+            self.require_data_file("counting-table.json").read_text(
+                encoding="utf-8"))
+        row3 = {"minimum": 3, "step": 99, "team": "Audit team",
+                "team_count": 3}
+        row1 = {"minimum": 1, "step": 99, "team": "Audit team",
+                "team_count": 3}
+        variants = {}
+        first = json.loads(json.dumps(shipped))
+        first["rows"] = [row1]
+        variants["per_step_rows 3, rows 1"] = first
+        second = json.loads(json.dumps(shipped))
+        second["per_step_rows"] = [row1]
+        second["rows"] = [row3]
+        variants["per_step_rows 1, rows 3"] = second
+        third = json.loads(json.dumps(shipped))
+        third["per_step_rows"] = [row3]
+        third["rows"] = [row3]
+        variants["same minimum in both parts"] = third
+        for label, table in variants.items():
+            with self.subTest(variant=label):
+                res = self.staged_table_run(table)
+                self.assertEqual(res.returncode, 6)
+                self.assert_in_stdout(res, "TOOL FAULT")
+                self.assertIsNone(rollup_of(res))
+
+    def test_distinct_rows_across_table_parts_still_govern(self):
+        # Control for R4-NB-5: a rows part row for a step and team
+        # that stands in no other part is no duplicate, and the
+        # table stands and governs as before.
+        shipped = json.loads(
+            self.require_data_file("counting-table.json").read_text(
+                encoding="utf-8"))
+        table = json.loads(json.dumps(shipped))
+        table["rows"] = [{"minimum": 1, "step": 98,
+                          "team": "Audit team", "team_count": 3}]
+        res = self.staged_table_run(table)
+        self.assert_rollup(res, "PASS", 0)
+
+    def test_context_tier_statement_does_not_govern(self):
+        # Step 15 round 4, R4-NB-2 and C4-F2: a context file states
+        # freshness facts only. Its Tier applied statement supplies
+        # no tier: the run stands as it stands with no context file,
+        # tier applied not proven and the Imagination team judged
+        # at the standing figure.
+        roster = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")]),
+                   ("Imagination team", None,
+                    [("Imagineer Red", 4, "counted in base"),
+                     ("Imagineer Blue", 5, "counted in base"),
+                     ("Imagineer Purple", 6, "counted in base")])],
+            board=self.BOARD).replace(". Tier: Low.", ".")
+        control, _ = self.run_stage({"roster.md": roster})
+        self.assert_rollup(control, "PASS", 0)
+        res = self.run_with_context(
+            roster, "# Context\n\nTier applied: High.\n")
+        self.assert_rollup(res, "PASS", 0)
+        self.assertEqual(self.agentic(res)["tier_applied"],
+                         "not proven from the supplied records")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Imagination team"]["minimum"], 2)
+
+    def test_context_board_statements_do_not_govern(self):
+        # R4-NB-2 and C4-F2: a Board chair line and board member
+        # lines in a context file name no holder for the stage
+        # judged and complete no review board.
+        short_board = [("Board member one", 11),
+                       ("Board member two", 12)]
+        roster = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=short_board)
+        control, _ = self.run_stage({"roster.md": roster})
+        self.assert_rollup(control, "FAIL", 1)
+        res = self.run_with_context(
+            roster, "# Context\n\nBoard chair: holder %s.\n"
+                    % sid(13))
+        self.assert_rollup(res, "FAIL", 1)
+        one_board = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=[("Board member one", 11)])
+        res = self.run_with_context(
+            one_board,
+            "# Context\n\n- Member 1: holder session %s.\n"
+            "Holder: review board member 2, session %s.\n"
+            % (sid(12), sid(13)))
+        self.assert_rollup(res, "FAIL", 1)
+
+    def test_context_chosen_size_statement_does_not_govern(self):
+        # R4-NB-2 and C4-F2: a chosen size statement in a context
+        # file chooses no size. The banded team stands NOT PROVEN
+        # for its unstated chosen size, as it stands alone.
+        roster = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")]),
+                   ("Pre plan research team", None,
+                    [("Researcher Red", 21, "counted in base"),
+                     ("Researcher Blue", 22, "counted in base"),
+                     ("Researcher Purple", 23, "counted in base")])],
+            board=self.BOARD)
+        control, _ = self.run_stage({"roster.md": roster})
+        self.assert_rollup(control, "NOT PROVEN", 2)
+        for size in ("3", "10"):
+            with self.subTest(size=size):
+                res = self.run_with_context(
+                    roster, "# Context\n\nChosen size for the Pre "
+                            "plan research team is %s.\n" % size)
+                self.assert_rollup(res, "NOT PROVEN", 2)
+
+    def test_context_defective_and_exempt_statements_do_not_govern(self):
+        # R4-NB-2 and C4-F2: a defective roster statement and the
+        # two exempt proofs in a context file move no verdict. The
+        # passing roster stays PASS beside the defective statement,
+        # and the exempt position seat stays counted in the open
+        # beside the context proofs, as it stands alone.
+        res = self.run_with_context(
+            simple_roster(),
+            "# Context\n\nThis roster is proven defective as a "
+            "record and no other record speaks to the true "
+            "staffing.\n")
+        self.assert_rollup(res, "PASS", 0)
+        roster = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "exempt")])],
+            board=self.BOARD)
+        control, _ = self.run_stage({"roster.md": roster})
+        self.assert_rollup(control, "PASS", 0)
+        res = self.run_with_context(
+            roster,
+            "# Context\n\nExempt entry: Colour lens Purple, holder "
+            "%s, exempt class fixers in defect and fix loops.\n"
+            "Exemption basis for the Colour lens Purple seat: the "
+            "fixer repaired the round it is exempt from.\n"
+            % sid(3))
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def test_context_claim_statements_do_not_govern(self):
+        # R4-NB-2 and C4-F2: claim statements in a context file are
+        # not claims of the run. A freshness claim, a combined scope
+        # claim, and an artefact proven claim in a context file move
+        # no verdict, and a staffing claim in one prints no claim
+        # disagreement.
+        for line in (
+                "Freshness claim: family 3 held for this stage.",
+                "Report text claim: a combined scope is claimed "
+                "for this stage.",
+                "Claim: the Audit team is artefact proven for this "
+                "stage.",
+                "Stage register text: the three audit passes are "
+                "members of the Audit team."):
+            with self.subTest(line=line):
+                res = self.run_with_context(
+                    simple_roster(), "# Context\n\n%s\n" % line)
+                self.assert_rollup(res, "PASS", 0)
+                self.assertNotIn("claim disagreement", res.stdout)
+
+    def test_context_printed_result_statements_do_not_govern(self):
+        # R4-NB-2 and C4-F2, the printed result kinds: an Audit plan
+        # line, a Captain JP invocation line, seat total statements,
+        # a closure holder line, and a lost spawn line in a context
+        # file move no printed result and no flag.
+        res = self.run_with_context(
+            simple_roster(),
+            "# Context\n\nAudit plan: colours Red, Blue and "
+            "Purple.\n")
+        self.assert_rollup(res, "PASS", 0)
+        self.assert_in_stdout(
+            res, "Colour completeness: NOT PROVEN. No audit plan "
+                 "or round charge is named")
+        roster = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD,
+            claim_lines=["Stage claim: this stage ran at a reduced "
+                         "tier."])
+        res = self.run_stage(
+            {"roster.md": roster,
+             "tier.md": "# Tier record\n\nTier applied: Low.\n",
+             "ctx.md": "# Context\n\nCaptain JP invocation record "
+                       "stands for this stage.\n"},
+            context=["ctx.md"])[0]
+        self.assert_in_stdout(res, "FM-9")
+        res = self.run_with_context(
+            simple_roster(),
+            "# Context\n\nThe context states 5 seats for this "
+            "stage. The context states 4 seats for this stage.\n"
+            "Closure holder: holder %s.\n"
+            "A lost spawn stands declared in this context.\n"
+            % sid(41))
+        self.assert_rollup(res, "PASS", 0)
+        self.assertNotIn("completeness difference", res.stdout)
+        self.assertEqual(self.agentic(res)["uncounted_appendix"], [])
+        self.assertNotIn("Declared lost spawns", res.stdout)
+
+    def test_context_freshness_entries_still_reach_freshness(self):
+        # Control for the general context rule: holding entries in
+        # a context file are the freshness facts the brief assigns
+        # to context files, and they still reach the freshness
+        # checks after the cure.
+        roster = roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", 1, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD,
+            extra_lines=["Re auditor seat for Round 1: holder %s."
+                         % sid(1)],
+            claim_lines=["Freshness claim: family 1 held for this "
+                         "stage."])
+        res = self.run_with_context(
+            roster, "# Context\n\nHolding: fixer in Round 1, holder "
+                    "%s.\n" % sid(1))
+        self.assert_rollup(res, "FAIL", 1)
