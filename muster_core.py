@@ -502,6 +502,19 @@ def _normalised_holder_tokens(value):
 # head of the joined word, or a value in the not recorded words,
 # that list read on the joined form with its spaces removed, as
 # the placeholder words and phrases in this condition are read.
+# Round 11 adds one reading of the same form, stated at
+# _joined_word_is_repetition: a joined word that stands as one
+# component word of the phrase set repeated whole refuses on
+# the repetition closed form, as U N K N O W N U N K N O W N
+# refuses as Unknown Unknown refuses, a closed form repeated
+# being the closed form. The repetition reading is a whole
+# value reading of this wholly spaced form only: it is no
+# label segmentation of the joined word, the repeated words of
+# its battery standing in no segment vocabulary, and it is no
+# reading at the head of a joined word, so it stands outside
+# both arms of Bound R8-SPACED-SEGMENTATION-RESIDUAL as that
+# bound is named, and that bound stands neither closed nor
+# widened by it.
 # The residue of this form stands named in the
 # round 8 fix register at its bound and is not closed here: a
 # segmentation needing at least two single letter pieces is
@@ -622,6 +635,22 @@ def _joined_word_is_closed(word):
             # after it, as the spaced form of a value carrying
             # that strong token as one of its tokens.
             return True
+    for token in _PLACEHOLDER_STRONG_TOKENS:
+        at = word.find(token, 1)
+        while at != -1:
+            if at + len(token) < len(word):
+                # A strong placeholder token standing in the
+                # middle of the joined word, with letters of the
+                # word standing before it and after it, as the
+                # spaced form of a value carrying that strong
+                # token as one of its words between two other
+                # words merged into the same token, round 11.
+                # A strong token standing at the tail of the
+                # joined word, with no letters after it, stands
+                # outside this reading, exactly as Bound
+                # R10-STRONG-TAIL-RESIDUAL records it.
+                return True
+            at = word.find(token, at + 1)
     if word in _NOT_RECORDED_JOINED_FORMS:
         # The not recorded words in their joined form: the word
         # here already stands with its spaces removed, so it is
@@ -654,6 +683,30 @@ def _joined_word_is_label_word(word):
     return word in _SPELLED_TAIL_WORDS
 
 
+def _joined_word_is_repetition(word):
+    """Whether a joined word stands in the repetition closed
+    form: the word stands as one component word of the phrase
+    set repeated whole, two or more times end to end, with no
+    other letters in it, as unknownunknown stands as unknown
+    repeated twice. This is the joined form of the repetition
+    reading the identifier rule applies to a plain value, where
+    every alpha token of the value is the same one component
+    word: a closed form repeated is the closed form, round 11.
+    The reading stands stated here, beside the wholly spaced
+    form that uses it, and in no other reading: the joined word
+    closed reading does not carry it, so a merged token in a
+    mixed value is not refused on it, exactly as a plain
+    repetition standing as part of a longer whole is not
+    refused on the plain reading."""
+    for component in _PLACEHOLDER_COMPONENT_WORDS:
+        if len(word) % len(component) == 0 \
+                and word == component * (len(word)
+                                         // len(component)) \
+                and len(word) // len(component) >= 2:
+            return True
+    return False
+
+
 def _wholly_spaced_name_counts(value):
     """Whether a value standing wholly as one run of spaced
     single letters counts as an initialled name, on the form
@@ -669,6 +722,8 @@ def _wholly_spaced_name_counts(value):
             len(token) == 1 and token.isalpha() for token in raw):
         return False
     if _joined_word_is_closed(word):
+        return False
+    if _joined_word_is_repetition(word):
         return False
     if _joined_word_is_label_word(word):
         return False
@@ -733,9 +788,17 @@ def _wholly_spaced_name_counts(value):
 # that reading reaches the merged token, as a strong placeholder
 # token standing at its head, the value refuses, as
 # T B D S M I T H Jones refuses on its merged token tbdsmith.
-# A merged token that stands in no closed form on that reading
-# keeps counting on the standing grounds, as J O N E S Smith
-# counts on its merged token jones.
+# Round 11 carries that same reading to the middle position: a
+# strong placeholder token standing in the middle of a merged
+# token, with letters of the token standing before it and after
+# it, refuses in the same way, as S M I T H T B D J O N E S
+# Bloggs refuses on its merged token smithtbdjones. A strong
+# token standing at the tail of a merged token, with no letters
+# after it inside the token, stands outside this reading, as
+# Bound R10-STRONG-TAIL-RESIDUAL records it, and keeps counting
+# in that bound form. A merged token that stands in no closed
+# form on that reading keeps counting on the standing grounds,
+# as J O N E S Smith counts on its merged token jones.
 
 def _holder_tokens_and_run_lengths(value):
     """The normalised tokens of a holder value, with the length
@@ -922,7 +985,11 @@ def is_identifier(value):
     J S M I T H counts as the initialled name it spells, while a
     run joining into a label word standing on its own, as in
     S E A T, or into label tokens under the limbs, as in
-    S E A T I D, refuses on those same grounds. A run of spaced
+    S E A T I D, refuses on those same grounds, and a run
+    joining into one component word of the phrase set repeated
+    whole refuses on the repetition form, as
+    U N K N O W N U N K N O W N refuses as Unknown Unknown
+    refuses. A run of spaced
     single letters standing inside a value, beside an intact
     word, judges the same way where it joins two words of the
     value into one token: where that token segments into
@@ -950,7 +1017,11 @@ def is_identifier(value):
     while J J Seat counts on the excepted shape; and a merged
     token judges on the joined word closed reading as a wholly
     spaced run judges, as T B D S M I T H Jones refuses on the
-    strong token at the head of its merged token. A genuine complete name is judged the same way and
+    strong token at the head of its merged token and
+    S M I T H T B D J O N E S Bloggs refuses on the strong token
+    in the middle of its merged token, a strong token at the
+    tail of a merged token standing outside that reading in the
+    form Bound R10-STRONG-TAIL-RESIDUAL records. A genuine complete name is judged the same way and
     stands: a name that merely contains a phrase component word
     as one word among its own name words, such as Placeholder
     Smith or Pending Sutton, counts on its own form, and a
@@ -1048,9 +1119,10 @@ def is_identifier(value):
         # standing inside the value judges on the joined word
         # closed reading as a wholly spaced run judges: where
         # that reading reaches the merged token, as a strong
-        # placeholder token standing at its head, the value
-        # refuses exactly as its plain form refuses, as the
-        # round 10 passage states.
+        # placeholder token standing at its head or in its
+        # middle, the value refuses exactly as its plain form
+        # refuses, as the round 10 passage states and the
+        # round 11 passage carries to the middle position.
         return False
     return True
 

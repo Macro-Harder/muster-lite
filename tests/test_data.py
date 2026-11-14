@@ -2774,3 +2774,409 @@ class TestStep15Round10FixesData(MusterCase):
                       "S E A T O N E", "H O L D E R N U M B E R S"):
             with self.subTest(value=value):
                 self.assert_holder_refuses(value)
+
+
+class TestStep15Round11FixesData(MusterCase):
+    """Step 15 round 11 fix round tests, Builder 1 item F1: a
+    strong placeholder token refuses where a spaced run merges
+    it in the middle of one token, a word on each side of it
+    inside the token, judged under the same closed reading that
+    reaches the head position. The tail position stands pinned
+    in its bound form at Bound R10-STRONG-TAIL-RESIDUAL and is
+    not a defect in this class."""
+
+    BOARD = [("Board member one", 11), ("Board member two", 12),
+             ("Board chair", 13)]
+
+    def roster_with_holder(self, value):
+        return roster_text(
+            teams=[("Audit team", None,
+                    [("Colour lens Red", value, "counted in base"),
+                     ("Colour lens Blue", 2, "counted in base"),
+                     ("Colour lens Purple", 3, "counted in base")])],
+            board=self.BOARD)
+
+    def assert_holder_refuses(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertLess(counts["Audit team"]["counted_total"], 3)
+
+    def assert_holder_counts(self, value):
+        res, _ = self.run_stage(
+            {"roster.md": self.roster_with_holder(value)})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def assert_full_roster_refuses(self, holders):
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_report_present(res)
+        self.assertNotEqual(rollup_of(res), "PASS")
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 0)
+
+    def assert_full_roster_counts(self, holders):
+        roles = ("Colour lens Red", "Colour lens Blue",
+                 "Colour lens Purple")
+        text = roster_text(
+            teams=[("Audit team", None,
+                    [(role, holder, "counted in base")
+                     for role, holder in zip(roles, holders)])],
+            board=self.BOARD)
+        res, _ = self.run_stage({"roster.md": text})
+        self.assert_rollup(res, "PASS", 0)
+        counts = {c["name"]: c for c in self.agentic(res)["counts"]}
+        self.assertEqual(counts["Audit team"]["counted_total"], 3)
+
+    def test_middle_strong_token_values_refuse_round11(self):
+        # Step 15 round 11, F1 (Breaker R11-NB-1): four values
+        # where one run merges three words into one token and a
+        # strong placeholder token stands in the middle of that
+        # token, a word on each side of it inside the token,
+        # beside one intact word. Each refuses, and the full
+        # roster held by the first three counts 0.
+        for value in ("S M I T H T B D J O N E S Bloggs",
+                      "J O N E S T B C S M I T H Bloggs",
+                      "B L O G G S T B A H O L D E R Jones",
+                      "I D O N E T B D C O D E Seat"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("S M I T H T B D J O N E S Bloggs",
+             "J O N E S T B C S M I T H Bloggs",
+             "B L O G G S T B A H O L D E R Jones"))
+
+    def test_middle_strong_token_plain_forms_refuse_round11(self):
+        # F1 plain counterparts: the same four values in plain
+        # form refuse on the strong token standing as one of
+        # the tokens of the value.
+        for value in ("Smith TBD Jones Bloggs",
+                      "Jones TBC Smith Bloggs",
+                      "Bloggs TBA Holder Jones",
+                      "ID One TBD Code Seat"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_head_strong_token_position_controls_refuse_round11(self):
+        # F1 head position controls: a strong token standing at
+        # the head of its merged token refuses under the round
+        # 10 F4 cure, at the head of the value and at its tail.
+        for value in ("T B D S M I T H Jones",
+                      "T B C J O N E S Smith",
+                      "T B A H O L D E R Jones",
+                      "Jones T B D S M I T H",
+                      "T B D J O N E S Smith",
+                      "T B D S E A T Jones"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_tail_strong_token_bound_forms_count_round11(self):
+        # Bound R10-STRONG-TAIL-RESIDUAL, pinned as bound
+        # behaviour and not as a defect: a strong token standing
+        # at the tail of a merged token, merged with the word
+        # before it beside an intact word, counts exactly as
+        # the bound records. The register pair and the four
+        # fresh bound forms of the round 11 Breaker paper count,
+        # their full roster counts 3, and their plain forms
+        # refuse beside them.
+        for value in ("S M I T H T B D Jones",
+                      "J O N E S T B D Smith",
+                      "B L O G G S T B C Smith",
+                      "S M I T H T B A Jones",
+                      "Seat I D O N E S M I T H T B D",
+                      "I D O N E T B D Seat"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+        self.assert_full_roster_counts(
+            ("S M I T H T B D Jones", "J O N E S T B D Smith",
+             "B L O G G S T B C Smith"))
+        for value in ("Smith TBD Jones", "Jones TBD Smith"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_merged_token_genuine_values_count_round11(self):
+        # F1 genuine controls: genuine values with a merged
+        # token standing in no closed form keep counting, tokens
+        # standing as written are never read on a joined form,
+        # and the round 8 bound pair stands in its bound form.
+        for value in ("J O N E S Smith", "S M I T H Jones",
+                      "Bloggs S T O N E", "Fixture T O N E S Smith",
+                      "Seat Idone", "Holder Idone", "Seat Codetwo",
+                      "Agent Numbera", "Seat Ida", "J S Smith",
+                      "Ida S E A T", "Fixture I D O N E",
+                      "Smith S E A T O N E", "Mary S M I T H",
+                      "J R Smith", "John S M I T H",
+                      "Mary H O L D E R", "John S E A T",
+                      "Chosen One", "A B O N E"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+        self.assert_holder_refuses("I D A S E A T")
+
+    def test_repetition_wholly_spaced_values_refuse_round11(self):
+        # Step 15 round 11, F2 (Breaker R11-NB-2): four values
+        # standing wholly as one run of spaced single letters
+        # spelling one component word of the phrase set twice
+        # refuse on the repetition closed form, exactly as
+        # their plain forms refuse, and the full roster held by
+        # the first three counts 0.
+        for value in ("U N K N O W N U N K N O W N",
+                      "D E C I S I O N D E C I S I O N",
+                      "P E N D I N G P E N D I N G",
+                      "A P P R O V A L A P P R O V A L"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("U N K N O W N U N K N O W N",
+             "D E C I S I O N D E C I S I O N",
+             "P E N D I N G P E N D I N G"))
+
+    def test_repetition_plain_forms_and_neighbour_refuse_round11(self):
+        # F2 plain counterparts: the same four values in plain
+        # form refuse on the repetition form of the rule, a
+        # value repeating one component word of the phrase set
+        # standing as the whole of it. The neighbouring repeated
+        # value whose joined word segments into label tokens
+        # refuses in both of its forms beside them.
+        for value in ("Unknown Unknown", "Decision Decision",
+                      "Pending Pending", "Approval Approval",
+                      "S E A T S E A T", "Seat Seat"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_repetition_single_and_mixed_forms_stand_round11(self):
+        # F2 standing forms, recorded as they stand and not
+        # charged: a single wholly spaced placeholder word
+        # refuses on the joined word closed reading in whole,
+        # a single wholly spaced component word that stands in
+        # no closed form counts on the initialled name reading,
+        # and a repetition standing as part of a longer whole
+        # counts in spaced form exactly as its plain form
+        # counts, the repetition form reaching a value only
+        # where the repeated word stands as the whole of it.
+        for value in ("U N K N O W N", "P E N D I N G"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        for value in ("D E C I S I O N", "A P P R O V A L",
+                      "U N K N O W N U N K N O W N Jones",
+                      "Unknown Unknown Jones"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_repetition_genuine_values_count_round11(self):
+        # F2 genuine controls: the round 8 wholly spaced names
+        # count with their full roster passing, and the Bound
+        # R8 pinned pair stands in its bound form, A B O N E
+        # counting on the counting arm and I D A S E A T
+        # refusing on the refusing arm.
+        for value in ("J S M I T H", "J S E A T", "A H O L D E R",
+                      "S E A T A", "H O L D E R A",
+                      "J O H N S M I T H", "A B O N E"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+        self.assert_full_roster_counts(
+            ("J S M I T H", "J S E A T", "A H O L D E R"))
+        self.assert_holder_refuses("I D A S E A T")
+
+    def test_interaction_strong_middle_beside_repetition_refuses_round11(self):
+        # Step 15 round 11, Builder 3 interaction surface: a
+        # merged token carrying a strong token in its middle
+        # stands in one value with a repetition token, in both
+        # orders, and with the repeated component word standing
+        # in plain form on each side of it. The repetition token
+        # in a mixed value stands outside the F2 reading, which
+        # reaches the wholly spaced form alone, and it does not
+        # shield the merged token: each value refuses on the F1
+        # middle arm exactly as its plain counterpart refuses on
+        # the strong token standing as a token of the value.
+        for value in (
+                      "U N K N O W N U N K N O W N S M I T H T B D J O N E S",
+                      "S M I T H T B D J O N E S U N K N O W N U N K N O W N",
+                      "Unknown S M I T H T B D J O N E S Unknown"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("U N K N O W N U N K N O W N S M I T H T B D J O N E S",
+             "S M I T H T B D J O N E S U N K N O W N U N K N O W N",
+             "P E N D I N G P E N D I N G S M I T H T B D J O N E S"))
+
+    def test_interaction_repetition_beside_merged_run_counts_round11(self):
+        # Interaction, the counting side: a repetition token
+        # standing beside a merged run that spells one name word
+        # counts, exactly as the Builder 2 standing form records
+        # for a repetition standing as part of a longer whole.
+        # Neither cure reaches it: the F2 reading reaches the
+        # wholly spaced form alone, and the merged name token
+        # stands in no closed form on the F1 reading.
+        for value in ("U N K N O W N U N K N O W N S M I T H",
+                      "U N K N O W N U N K N O W N J O N E S"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_interaction_three_merged_runs_strong_middle_refuses_round11(self):
+        # Interaction: three merged runs in one value, with a
+        # strong token in the middle of one of them, in the
+        # first run in one value and in the third run in the
+        # other. The joint label judgement cannot reach the
+        # strong token, which stands outside the enumerated
+        # label vocabulary, and the value refuses on the F1
+        # middle arm alone, the other runs standing as label
+        # runs beside it.
+        for value in (
+                      "S M I T H T B D J O N E S Holder C O D E T W O Agent N O I D",
+                      "Seat I D O N E Holder C O D E T W O A G E N T T B D S M I T H"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        self.assert_full_roster_refuses(
+            ("S M I T H T B D J O N E S Holder C O D E T W O Agent N O I D",
+             "Seat I D O N E Holder C O D E T W O A G E N T T B D S M I T H",
+             "S M I T H T B D J O N E S Holder C O D E T W O Seat I D O N E"))
+
+    def test_interaction_repetition_second_spelling_merged_round11(self):
+        # Interaction: a repeated closed form whose second
+        # spelling carries a merge. Where the value stands
+        # wholly as one run, the second spelling stands merged
+        # with the first into the single joined word, and the
+        # value refuses on the F2 repetition reading, on fresh
+        # component words beside the charged battery. Where the
+        # first spelling stands plain and the second spelling
+        # stands as one merged token beside it, the value counts
+        # on the Builder 2 standing form: the repetition reading
+        # is not carried into a merged token in a mixed value,
+        # exactly as a plain repetition standing as part of a
+        # longer whole is not refused on the plain reading.
+        for value in ("C O N F I R M E D C O N F I R M E D",
+                      "A S S I G N E D A S S I G N E D"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        for value in ("Decision D E C I S I O N D E C I S I O N",
+                      "Approval A P P R O V A L A P P R O V A L"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_interaction_wholly_spaced_strong_positions_round11(self):
+        # Interaction on the wholly spaced reach the two cures
+        # share: a wholly spaced value whose single joined word
+        # carries a strong token in its middle refuses on the
+        # F1 middle arm through the wholly spaced form, as the
+        # Builder 1 section records on direct drives. A wholly
+        # spaced value whose joined word carries the strong
+        # token at its tail counts, Bound
+        # R10-STRONG-TAIL-RESIDUAL standing in wholly form
+        # exactly as it stands in mixed form, pinned here as
+        # bound behaviour and not as a defect.
+        self.assert_holder_refuses("S M I T H T B D J O N E S")
+        self.assert_holder_counts("S M I T H T B D")
+
+    def test_candidate_bounds_stand_as_recorded_round11(self):
+        # The two candidate bounds named in the open by the
+        # Builder 1 and Builder 2 sections, pinned as they stand
+        # and not presented as closed. Candidate Bound
+        # R11-STRONG-MIDDLE-WORD-RESIDUAL: one genuine word
+        # spelled letter by letter beside an intact word, whose
+        # letters carry a strong token in the middle position as
+        # part of that one word, refuses, while its plain form
+        # counts. Candidate Bound R11-REPETITION-NAME-RESIDUAL:
+        # a joined word standing both as one component word
+        # repeated whole and as an initial before a name word
+        # refuses on the repetition reading.
+        self.assert_holder_refuses("O U T B A C K Jones")
+        self.assert_holder_counts("Outback Jones")
+        self.assert_holder_refuses("T O T O")
+
+    def test_regression_rounds1to10_representatives_round11(self):
+        # Builder 3 regression surface: representative forms of
+        # the charged classes of rounds 1 to 10, driven in this
+        # class beside the two round 11 cures. The plain
+        # placeholder forms, the label limbs, the round 7
+        # vocabulary combinations and letter compounds, the
+        # round 8 wholly spaced label forms, the round 9 merged
+        # runs and not recorded variants, and the round 10 F1,
+        # F2, and F3 charged shapes refuse. The genuine forms,
+        # the round 7 letter shape exceptions, the round 10 F2
+        # excepted letter shape, and the round 8 spaced names
+        # count.
+        for value in ("To be decided", "Pending approval",
+                      "Placeholder value", "To Be Determined",
+                      "Seat 1", "Seat ID One", "No Seat", "ID Code",
+                      "A One", "Fragment A B", "Seat ID Number",
+                      "Numbers Seat", "A ID", "J Seat ID",
+                      "S E A T I D", "Seat I D O N E",
+                      "N O T R E C O R D E D", "To B E D E C I D E D",
+                      "Seat A O N E A",
+                      "Seat I D O N E Holder C O D E T W O"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+        for value in ("Chosen One", "Placeholder Smith",
+                      "Pending Sutton", "Fixture ID One", "J Seat",
+                      "A Holder", "Seat A", "Holder A", "J J Seat",
+                      "J S M I T H", "S E A T A"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+
+    def test_bounds_pinned_pairs_and_observations_round11(self):
+        # Builder 3 regression surface: the seven bounds in
+        # their recorded behaviour and the two open observations
+        # standing as recorded. The Bound R8 pinned pair and the
+        # Bound R10-STRONG-TAIL-RESIDUAL pair stand pinned in
+        # this class at the Builder 1 and Builder 2 entries and
+        # are not repeated here. Counting, in bound form: fresh
+        # Family A wordings inside C4-F1; one wording of each
+        # class of Bound R5-LABEL-RESIDUAL; one wording of each
+        # class of Bound R6-NO-TAIL-RESIDUAL, with its genuine
+        # neighbour; two pinned values of Bound
+        # R7-NO-HEAD-RESIDUAL; and the register pair of Bound
+        # R10-MIXED-SEGMENTATION-RESIDUAL. Refusing beside them:
+        # the plain counterpart of the mixed segmentation pair,
+        # and the two refusing wholly spaced exceptions recorded
+        # inside Bound R7. The observations: Seat ID Hundred
+        # counts beside Bound R5 class 2, and plain Not assigned
+        # counts with its mixed run form counting and its wholly
+        # spaced form refusing.
+        for value in ("Appointment outcome still awaited",
+                      "Holder name yet to be entered",
+                      "Podium six", "Seat billion", "Holder IV",
+                      "Seat Origin", "Stand Code", "Fixture Code",
+                      "Nos One", "One Two", "Seat A O N E B A",
+                      "Seat A B C One", "Seat ID Hundred",
+                      "Not assigned", "Not A S S I G N E D"):
+            with self.subTest(value=value):
+                self.assert_holder_counts(value)
+        for value in ("Seat A One B A", "N O T H R E E",
+                      "N O S T W O", "N O T A S S I G N E D"):
+            with self.subTest(value=value):
+                self.assert_holder_refuses(value)
+
+    def test_standing_data_pins_round11(self):
+        # Builder 3 regression surface: the standing data pins,
+        # verified first hand on the product data itself. The
+        # phrase set stands at 71 and its joined set at 71, the
+        # not recorded joined set stands exactly as the three
+        # forms named, and the label limbs and enumerated sets
+        # stand unchanged in membership: the label head words at
+        # 16, the field words as id, identifier, and code, the
+        # spelled cardinals at 27, the spelled ordinals at 27,
+        # and the segmentation vocabulary at 96.
+        import muster_core
+        self.assertEqual(len(muster_core._PLACEHOLDER_PHRASES), 71)
+        self.assertEqual(
+            len(muster_core._PLACEHOLDER_PHRASES_JOINED), 71)
+        self.assertEqual(
+            muster_core._NOT_RECORDED_JOINED_FORMS,
+            frozenset(("noidrecorded", "none", "notrecorded")))
+        self.assertEqual(len(muster_core._LABEL_HEAD_WORDS), 16)
+        self.assertEqual(
+            muster_core._LABEL_FIELD_WORDS,
+            frozenset(("id", "identifier", "code")))
+        self.assertEqual(len(muster_core._SPELLED_CARDINALS), 27)
+        self.assertEqual(len(muster_core._SPELLED_ORDINALS), 27)
+        self.assertEqual(len(muster_core._SEGMENT_WORDS), 96)
