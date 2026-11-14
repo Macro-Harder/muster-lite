@@ -1,8 +1,6 @@
 # Muster-lite
 
-Muster-lite is a grade L2 records checker. It is not the DQ-012
-isolated checker, and grade L3 is not available for labelling any
-record from this tool.
+Muster-lite is a records checker.
 
 Muster-lite checks the records of one stage of a build against the
 staffing rules those records name: whether the teams a stage calls
@@ -103,14 +101,6 @@ problems. These are the ones that cause trouble most often:
   are printed side by side as a claim disagreement or a
   completeness difference. The tool corrects nothing; the records
   named are the ones that must change.
-
-## Tests
-
-The product test suite runs with one command, from the repo root:
-
-```sh
-python3 -m unittest discover -s tests -t . -v
-```
 
 ## License
 
