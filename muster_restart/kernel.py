@@ -936,6 +936,75 @@ def _duplicate_holdings(run_input):
     return holdings
 
 
+LINKAGE_NOT_APPLICABLE = (
+    "not applicable: linkage did not pass for this seat")
+
+
+def _roster_location(run_input, seat_key=None):
+    """The roster line location a PASS rests on, shape 8.
+
+    A seat that carries its own roster line location supplies it.
+    Otherwise the location names the roster record file, where the
+    run input states one, and the seat the evidence rests on, so
+    the location states a place a reader can follow and never
+    only the kind of record.
+    """
+    roster = run_input.get("roster")
+    roster = roster if isinstance(roster, dict) else {}
+    file_name = roster.get("file") or roster.get("path") \
+        or "roster record"
+    seats = _roster_seats(run_input)
+    seat = None
+    for candidate in seats:
+        if seat_key is not None and \
+                candidate.get("seat_key") == seat_key:
+            seat = candidate
+            break
+    if seat is None and seats:
+        seat = seats[0]
+    if seat is not None and seat.get("roster_line_location"):
+        return str(seat["roster_line_location"])
+    key = seat_key
+    if key is None and seat is not None:
+        key = seat.get("seat_key")
+    return "%s, seat %s" % (file_name, key if key is not None
+                            else "not stated")
+
+
+def _apply_pass_citations(run_input, entry):
+    """Shape 8 PASS standing for one CheckResult.
+
+    Citations carry two locations: the roster line location and
+    the artefact author record line location where linkage passed
+    for the seat, the second location standing in words where
+    linkage did not pass or did not apply. Observed evidence
+    carries its location, naming its evidence file and seat, and
+    stands non empty on every PASS.
+    """
+    if entry.get("verdict") != "PASS":
+        return entry
+    evidence = entry.get("evidence")
+    if not isinstance(evidence, dict):
+        evidence = {}
+        entry["evidence"] = evidence
+    seat_key = evidence.get("seat")
+    location = _roster_location(run_input, seat_key)
+    roster = run_input.get("roster")
+    roster = roster if isinstance(roster, dict) else {}
+    evidence.setdefault("file", roster.get("file")
+                        or roster.get("path") or "roster record")
+    if "seat" not in evidence:
+        seats = _roster_seats(run_input)
+        evidence["seat"] = seats[0].get("seat_key") if seats else None
+    evidence.setdefault("location", location)
+    second = entry.get("author_record_line_location") \
+        or LINKAGE_NOT_APPLICABLE
+    entry["roster_line_location"] = location
+    entry["citations"] = [location, second]
+    entry["missing_fact"] = None
+    return entry
+
+
 def _check_results(run_input, differing, reading, verification,
                    base_standing, tables=None, team_counts=None,
                    parsed=None):
@@ -975,6 +1044,7 @@ def _check_results(run_input, differing, reading, verification,
             "composing": composing,
             "composes": composing,
             "rule": "brief section 5.5 item %d" % number,
+            "seat_or_team": None,
             "expected_property": "the property item %d states" % number,
             "evidence": {},
             "verdict": "PASS",
@@ -983,10 +1053,7 @@ def _check_results(run_input, differing, reading, verification,
         }
 
     def finish(entry):
-        if entry["verdict"] == "PASS":
-            entry["citations"] = ["roster record"]
-            entry["missing_fact"] = None
-        return entry
+        return _apply_pass_citations(run_input, entry)
 
     results = []
     for number in CHECK_ORDER:
@@ -1108,8 +1175,13 @@ def _check_results(run_input, differing, reading, verification,
                 entry["missing_fact"] = (
                     "the presence statement for the Contrarian seat")
         elif number == 4:
-            board = roster.get("board_seats", [])
-            if board:
+            if "board_seats" not in roster:
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = (
+                    "the board record for the stage, standing read "
+                    "in the roster record")
+            else:
+                board = roster.get("board_seats") or []
                 full_holders = {s.get("agent_identifier") for s in board
                                 if s.get("agent_kind",
                                          "full identifier")
@@ -1141,21 +1213,65 @@ def _check_results(run_input, differing, reading, verification,
                 totals = target["property_conditioned_totals"]
                 counted = target["counted_total"]
                 differing_prop = None
+                differing_name = None
                 for prop in ("pool family", "perspective",
                              "qualification"):
                     total = totals[prop][
                         "property_conditioned_counted_total"]
                     if total != counted:
                         differing_prop = total
+                        differing_name = prop
                         break
                 if differing_prop is not None:
                     entry["evidence"]["counted_total"] = counted
                     entry["evidence"][
                         "property_conditioned_counted_total"] = \
                         differing_prop
-                    if totals["pool family"]["counted_seats_removed"] \
+                    entry["evidence"]["property"] = differing_name
+                    duplicate_perspective = False
+                    if differing_name == "perspective":
+                        # The duplicate group is judged over the
+                        # counted seats of the team only, under
+                        # shape 9: the team seats in roster order,
+                        # with duplicate holdings removed first and
+                        # exempt or uncounted seats removed second,
+                        # the same partition the team count stands
+                        # on. A duplicate value standing only on a
+                        # seat outside that partition forms no group.
+                        counted_seats = []
+                        seen_agents = set()
+                        for seat in seats:
+                            if seat.get("team", seat.get(
+                                    "team_name")) != target["team"]:
+                                continue
+                            agent = seat.get("agent_identifier")
+                            kind = seat.get(
+                                "agent_kind", "full identifier")
+                            if kind == "full identifier" and \
+                                    agent is not None:
+                                if agent in seen_agents:
+                                    continue
+                                seen_agents.add(agent)
+                            counted_seats.append(seat)
+                        counted_seats = [
+                            seat for seat in counted_seats
+                            if seat.get("counting_position") not in
+                            ("exempt", "uncounted at this step")]
+                        seen_values = set()
+                        for seat in counted_seats:
+                            value = seat.get("perspective")
+                            if value in (None, "not stated"):
+                                continue
+                            if value in seen_values:
+                                duplicate_perspective = True
+                                break
+                            seen_values.add(value)
+                    if duplicate_perspective:
+                        entry["verdict"] = "FAIL"
+                    elif totals["pool family"]["counted_seats_removed"] \
                             or totals["qualification"][
-                                "counted_seats_removed"]:
+                                "counted_seats_removed"] \
+                            or differing_name == "perspective":
                         entry["verdict"] = "NOT PROVEN"
                         entry["missing_fact"] = (
                             "a stated property standing for every "
@@ -1888,7 +2004,8 @@ def _difference_duty(run_input, parsed):
             "missing_fact": missing_fact, "listing": CHECK17_LISTING}
 
 
-def _place_check17(check_results, difference, parsed):
+def _place_check17(check_results, difference, parsed,
+                   run_input=None):
     """Check 17 placement: its CheckResult stands at field 6 through
     slice 5 assembly in a gate run, and no CheckResult and no
     LimbResult for check 17 stands in a precheck, where check 17
@@ -1902,35 +2019,128 @@ def _place_check17(check_results, difference, parsed):
         "composing": True,
         "composes": True,
         "rule": "brief section 5.6.2",
+        "seat_or_team": None,
         "expected_property": "the property item 17 states",
         "evidence": {},
         "verdict": difference["verdict"],
         "missing_fact": difference["missing_fact"],
-        "citations": ["roster record"] if difference["verdict"] == "PASS"
-                     else [],
+        "citations": [],
     }
+    if run_input is not None:
+        _apply_pass_citations(run_input, entry)
     results.append(entry)
     return results
 
 
-def _limb_results(parsed):
+LISTED_LIMB_ENTRIES = {
+    10: ["invocation limb, listed, waiting for the gate record"],
+    12: ["linkage limb, listed, waiting for the gate roster"],
+    16: ["claim agreement limb, listed, waiting for the gate record"],
+}
+
+PRECHECK_FIELD_10 = (
+    "check 10 invocation limb, listed, waiting for the gate "
+    "record; check 12 linkage limb, listed, waiting for the gate "
+    "roster; check 16 claim agreement limb, listed, waiting for "
+    "the gate record; check 17, listed in full, waiting for the "
+    "gate roster and the gate record")
+
+
+def _limb_results(parsed, run_input=None):
     """LimbResult production for the precheck run limbs of the
-    checks listed in part, checks 10 and 12 built in slice 4 and
-    check 16 standing in its slice, each standing as a LimbResult
-    at field 6 with its listed limbs named at field 10 and no
-    CheckResult for the check in a precheck.
+    checks listed in part, checks 10, 12 and 16, each standing as
+    a LimbResult at field 6 in shape 8A form, with its listed
+    limbs named at field 10 and in its listed limbs list in the
+    freeze naming form, and no CheckResult for the check in a
+    precheck. A LimbResult verdict states its run limb only: it
+    stands PASS only where the evidence that limb rests on stands
+    in the run input, and NOT PROVEN, with the missing fact named,
+    where no such evidence stands. No verdict stands for a listed
+    limb in any entry.
     """
     if parsed["run_kind"] != "precheck":
         return []
-    names = {10: "tier statement limb",
-             12: "artefact linkage limb",
-             16: "claim agreement limb"}
-    return [{"check": number, "kind": "LimbResult",
-             "limb": names[number],
-             "rule": "brief section 5.6.1",
-             "verdict": "PASS",
-             "listed_limbs": [names[number]]}
-            for number in (10, 12, 16)]
+    if run_input is None:
+        run_input = {}
+    stage = run_input.get("stage_judged")
+    seats = _roster_seats(run_input)
+    products = []
+    for seat in seats:
+        for product in seat.get("work_products") or []:
+            products.append((seat.get("seat_key"), product))
+    tier = run_input.get("tier", parsed.get("tier"))
+    entries = []
+    tier_entry = {
+        "check": 10, "kind": "LimbResult",
+        "limb": "tier statement limb",
+        "rule": "brief section 5.6.1",
+        "seat_or_team": stage,
+        "expected_property": (
+            "the tier applied is the tier the target tier record "
+            "states"),
+        "evidence": {"file": "tier record", "seat": None,
+                     "observed": tier},
+        "verdict": "PASS",
+        "missing_fact": None,
+        "listed_limbs": list(LISTED_LIMB_ENTRIES[10]),
+    }
+    if tier in (None, "not stated"):
+        tier_entry["verdict"] = "NOT PROVEN"
+        tier_entry["missing_fact"] = (
+            "the tier the target tier record states")
+    entries.append(tier_entry)
+    linkage_entry = {
+        "check": 12, "kind": "LimbResult",
+        "limb": "linkage limb",
+        "rule": "brief section 5.6.1",
+        "seat_or_team": products[0][0] if products else None,
+        "expected_property": (
+            "the author record inside an artefact equals the "
+            "roster id for that seat"),
+        "evidence": {"file": "roster record",
+                     "seat": products[0][0] if products else None,
+                     "observed": products[0][1] if products else None},
+        "verdict": "PASS",
+        "missing_fact": None,
+        "listed_limbs": list(LISTED_LIMB_ENTRIES[12]),
+    }
+    if not products:
+        linkage_entry["verdict"] = "NOT PROVEN"
+        linkage_entry["missing_fact"] = (
+            "a work product standing at freeze for a linkage limb "
+            "of this run")
+    entries.append(linkage_entry)
+    differences, verdict16, _missing16 = _claim_agreement(run_input)
+    claim_keys = ("claim_kind", "direction", "claim_passage",
+                  "passage_outside_recording_fields",
+                  "build_union_claim_figure",
+                  "recording_capacity_only")
+    claim_entry = {
+        "check": 16, "kind": "LimbResult",
+        "limb": "claim agreement limb",
+        "rule": "brief section 5.6.1",
+        "seat_or_team": None,
+        "expected_property": (
+            "the claim points and the generated statement agree "
+            "in both directions"),
+        "evidence": {"file": "claim bearing file", "seat": None,
+                     "observed": len(differences)},
+        "verdict": "PASS",
+        "missing_fact": None,
+        "listed_limbs": list(LISTED_LIMB_ENTRIES[16]),
+    }
+    if verdict16 == "FAIL":
+        claim_entry["verdict"] = "FAIL"
+    elif verdict16 is not None or differences:
+        claim_entry["verdict"] = "NOT PROVEN"
+        claim_entry["missing_fact"] = _missing16
+    elif not any(key in run_input for key in claim_keys):
+        claim_entry["verdict"] = "NOT PROVEN"
+        claim_entry["missing_fact"] = (
+            "a claim point standing at freeze for a claim "
+            "agreement limb of this run")
+    entries.append(claim_entry)
+    return entries
 
 
 def _assemble(parsed, fields, check_results, extra):
@@ -1964,9 +2174,10 @@ def compute_result(run_input):
     check_results, check_side = _check_results(
         run_input, differing, reading, verification, base, tables,
         team_counts, parsed)
-    limb_results = _limb_results(parsed)
+    limb_results = _limb_results(parsed, run_input)
     difference = _difference_duty(run_input, parsed)
-    check_results = _place_check17(check_results, difference, parsed)
+    check_results = _place_check17(
+        check_results, difference, parsed, run_input)
     if parsed["run_kind"] != "precheck":
         for entry in check_results:
             if entry["check"] != 17:
@@ -2019,8 +2230,8 @@ def compute_result(run_input):
                 entry["verdict"] = verdict16
                 entry["verdict_position"] = verdict16
                 entry["missing_fact"] = missing16
-                entry["citations"] = ["roster record"] \
-                    if verdict16 == "PASS" else []
+                entry["citations"] = []
+                _apply_pass_citations(run_input, entry)
     repair_list = _repair_entries(
         run_input, check_results, team_counts, affected_checks)
 
@@ -2101,13 +2312,13 @@ def compute_result(run_input):
         "8": differences,
         "9": difference["field_9"],
         "10": "not a precheck" if parsed["run_kind"] != "precheck"
-              else ("listed limbs not yet run: check 10 listed "
-                    "limbs, check 12 listed limbs, check 16 listed "
-                    "limbs, check 17, listed in full"),
+              else PRECHECK_FIELD_10,
         "11": _RepairField({
             "missing_seats": [e for e in repair_list
                               if e["entry_kind"] == "missing seat"],
-            "duplicate_holdings": _duplicate_holdings(run_input),
+            "duplicate_holdings": [e for e in repair_list
+                                   if e["entry_kind"]
+                                   == "duplicate holding"],
             "unproven_seats": [e for e in repair_list
                                if e["entry_kind"] == "unproven seat"]},
             repair_list),

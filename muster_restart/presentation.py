@@ -318,21 +318,51 @@ def _view(result):
             differing = [d for d in raw_diff if isinstance(d, dict)]
 
     field10 = _field(result, 10, "precheck_not_yet_run_section")
-    field11 = _field(result, 11)
-    field11 = field11 if isinstance(field11, dict) else {}
+    # Contract field 11 stands as a grouped mapping, brief section
+    # 5.4.2 field 11: the missing seats list, the duplicate
+    # holdings list and the unproven seats list, each entry a
+    # RepairEntry at shape 15. The reading takes the grouped
+    # mapping itself from the fields mapping, key by key, because
+    # _field returns a single named value and field 11 carries
+    # three lists under its own keys and no shape name. A field 11
+    # standing as one flat RepairEntry list is read by entry kind
+    # into the same three lists, and a flat record carrying a list
+    # under a plain list name fills only a list the contract form
+    # leaves empty.
+    raw11 = fields.get("11")
+    if raw11 is None:
+        raw11 = result.get("repair_lists")
+    grouped11 = raw11 if isinstance(raw11, dict) else {}
     repair = {
-        "missing_seats": field11.get("missing_seats"),
-        "duplicate_holdings": field11.get("duplicate_holdings"),
-        "unproven_seats": field11.get("unproven_seats"),
+        "missing_seats": grouped11.get("missing_seats"),
+        "duplicate_holdings": grouped11.get("duplicate_holdings"),
+        "unproven_seats": grouped11.get("unproven_seats"),
     }
+    if isinstance(raw11, list):
+        kind_keys = {
+            "missing seat": "missing_seats",
+            "duplicate holding": "duplicate_holdings",
+            "unproven seat": "unproven_seats",
+        }
+        for entry in raw11:
+            if not isinstance(entry, dict):
+                continue
+            key = kind_keys.get(entry.get("entry_kind"))
+            if key is None:
+                continue
+            if not isinstance(repair[key], list):
+                repair[key] = []
+            repair[key].append(entry)
     for key, value in repair.items():
         repair[key] = [e for e in value if isinstance(e, dict)] \
             if isinstance(value, list) else []
-    if not any(repair.values()):
-        flat_missing = result.get("missing_seats")
-        if isinstance(flat_missing, list):
-            repair["missing_seats"] = [
-                e for e in flat_missing if isinstance(e, dict)]
+    for key in repair:
+        if repair[key]:
+            continue
+        flat_list = result.get(key)
+        if isinstance(flat_list, list):
+            repair[key] = [
+                e for e in flat_list if isinstance(e, dict)]
 
     differences = _field(result, 8, "claim_differences")
     if differences is None:
@@ -802,13 +832,19 @@ def _pass_rollup_header(view):
     report already prints, where a slack figure stands for at
     least one TeamCount; the words only header, using no figure
     and naming no team, where no TeamCount stands. No header
-    stands where the rollup is not PASS.
+    stands where the rollup is not PASS, and no header stands
+    where a TeamCount stands in the result but no TeamCount
+    carries a slack figure: brief section 5.7.8 states no header
+    form for that case, and the words only text would state that
+    no team count stands in a form that carries one.
     """
     if view["rollup_word"] != "PASS":
         return None
     figured = [c for c in view["counts"]
                if isinstance(c.get("slack"), int)]
     if not figured:
+        if view["counts"]:
+            return None
         return _WORDS_ONLY_HEADER
     smallest = min(c["slack"] for c in figured)
     teams = [str(c.get("team")) for c in figured
@@ -840,7 +876,7 @@ def _claim_flags(view):
 def _advanced_additions_carried(view):
     carried = ["full repair list", "full bounds list",
                "per check detail", "PASS evidence citations"]
-    if view["rollup_word"] == "PASS":
+    if _pass_rollup_header(view) is not None:
         carried.append("PASS rollup header")
     carried.append("claim disagreement flags")
     return carried
@@ -991,6 +1027,52 @@ def _open_case_positions(view):
     return positions
 
 
+def _agentic_citations(view):
+    """The Agentic PASS evidence citations, as fields.
+
+    Built by the one reading the Agentic form renders from and
+    the comparison reads from, so both sides state the same
+    citations for the same record.
+    """
+    citations = []
+    for entry in view["checks"]:
+        if _check_verdict(entry) != "PASS":
+            continue
+        first = entry.get("roster_line_location")
+        if not first and isinstance(entry.get("citations"), list) \
+                and entry["citations"]:
+            first = entry["citations"][0]
+        if not first:
+            continue
+        second = entry.get("author_record_line_location")
+        if not second:
+            second = _LINKAGE_WORDS
+        citations.append({
+            "check": _check_label(entry),
+            "roster_line_location": first,
+            "author_record_line_location": second,
+        })
+    return citations
+
+
+def _agentic_per_check(view):
+    """The Agentic per check results, as fields, from the reading."""
+    per_check = []
+    for entry in view["checks"]:
+        per_check.append({
+            "check": _check_label(entry),
+            "verdict": _check_verdict(entry),
+            "team": entry.get("team"),
+            "rule": entry.get("rule"),
+            "missing_fact": entry.get("missing_fact"),
+            "roster_line_location": entry.get(
+                "roster_line_location"),
+            "author_record_line_location": entry.get(
+                "author_record_line_location"),
+        })
+    return per_check
+
+
 def _render_agentic(view):
     """The Agentic form, as a structured field mapping.
 
@@ -1014,37 +1096,8 @@ def _render_agentic(view):
         entry = {"name": name}
         entry.update(values)
         elements.append(entry)
-    citations = []
-    for entry in view["checks"]:
-        if _check_verdict(entry) != "PASS":
-            continue
-        first = entry.get("roster_line_location")
-        if not first and isinstance(entry.get("citations"), list) \
-                and entry["citations"]:
-            first = entry["citations"][0]
-        if not first:
-            continue
-        second = entry.get("author_record_line_location")
-        if not second:
-            second = _LINKAGE_WORDS
-        citations.append({
-            "check": _check_label(entry),
-            "roster_line_location": first,
-            "author_record_line_location": second,
-        })
-    per_check = []
-    for entry in view["checks"]:
-        per_check.append({
-            "check": _check_label(entry),
-            "verdict": _check_verdict(entry),
-            "team": entry.get("team"),
-            "rule": entry.get("rule"),
-            "missing_fact": entry.get("missing_fact"),
-            "roster_line_location": entry.get(
-                "roster_line_location"),
-            "author_record_line_location": entry.get(
-                "author_record_line_location"),
-        })
+    citations = _agentic_citations(view)
+    per_check = _agentic_per_check(view)
     return {
         "run_kind": view["run_kind"] or "gate run",
         "rollup": values["rollup"],
@@ -1127,6 +1180,14 @@ _ELEMENT_CONTRACT_FIELD = {
     "PASS evidence citations": 6,
     "PASS rollup header": 12,
     "claim disagreement flags": 8,
+    "per check results": 6,
+    "roster difference result": 9,
+    "claim differences": 8,
+    "receipt": 5,
+    "ignored inputs": 5,
+    "field 12": 12,
+    "run kind": 2,
+    "open case positions": 12,
 }
 
 
@@ -1368,7 +1429,10 @@ def _compare_text_one(generated_form, view, skip):
                 and not view["is_precheck"]:
             continue
         if element not in form_map:
-            continue
+            return _defect_report(
+                element, form_kind,
+                _record_value(element, view, form_kind),
+                "not stated in the generated form"), element
         record_value = _record_value(element, view, form_kind)
         form_raw = form_map[element]
         if element == "counts lines":
@@ -1385,6 +1449,11 @@ def _compare_text_one(generated_form, view, skip):
                 continue
             record_value = _addition_record_value(element, view)
             if record_value is None:
+                if element in additions:
+                    return _defect_report(
+                        element, form_kind,
+                        "no value stands in the result record",
+                        additions[element]), element
                 continue
             if element not in additions:
                 return _defect_report(
@@ -1404,13 +1473,31 @@ def _compare_agentic_one(generated_form, view, skip):
     values the record reading carries: where one value of an
     element differs, the report carries that one value from the
     record and that one value from the form, and no whole shared
-    value mapping stands in either position. Skip carries the
-    element and value key pairs already reported for this form.
-    The form level rollup field stands compared last, against the
-    rollup standing the record reading carries for the form.
+    value mapping stands in either position. An element whose
+    entry the form does not carry stands reported as a missing
+    entry. Skip carries the element and value key pairs already
+    reported for this form. The form level rollup field stands
+    compared against the rollup standing the record reading
+    carries for the form, and the Agentic form additions and
+    fields stand compared after it, field by field.
     """
     expected = _element_values(view)
     elements = generated_form.get("elements")
+    entries_by_name = {}
+    if isinstance(elements, list):
+        for entry in elements:
+            if isinstance(entry, dict) \
+                    and entry.get("name") in CANONICAL_ELEMENTS \
+                    and entry.get("name") not in entries_by_name:
+                entries_by_name[entry["name"]] = entry
+    for element in CANONICAL_ELEMENTS:
+        if element not in entries_by_name:
+            if (element, "element entry") in skip:
+                continue
+            return _defect_report(
+                element, "Agentic", expected,
+                "not stated in the generated form"), (
+                    element, "element entry")
     if isinstance(elements, list):
         for entry in elements:
             if not isinstance(entry, dict):
@@ -1432,6 +1519,38 @@ def _compare_agentic_one(generated_form, view, skip):
                 expected["rollup"],
                 generated_form.get("rollup")), (
                     "rollup line", "rollup field")
+    # The Agentic form additions and fields at brief section
+    # 5.7.5, compared field by field against the same reading
+    # the form renders from: the per check results, the PASS
+    # evidence citations, the roster difference result, the
+    # claim differences, the receipt, the ignored inputs, the
+    # field 12 standing, the run kind and the open case
+    # positions. A field the form does not carry, or carries
+    # with a value the record does not carry, disagrees.
+    field_checks = (
+        ("per check results", "per_check_results",
+         _agentic_per_check(view)),
+        ("PASS evidence citations", "PASS evidence citations",
+         _agentic_citations(view)),
+        ("roster difference result", "roster_difference",
+         view["field9"]),
+        ("claim differences", "claim_differences",
+         view["differences"]),
+        ("receipt", "receipt", view["receipt"]),
+        ("ignored inputs", "ignored_inputs", view["ignored"]),
+        ("field 12", "field_12", _field_12_text(view)),
+        ("run kind", "run_kind", view["run_kind"] or "gate run"),
+        ("open case positions", "open_case_positions",
+         _open_case_positions(view)),
+    )
+    for element, key, record_value in field_checks:
+        if (element, "form field") in skip:
+            continue
+        form_value = generated_form.get(key)
+        if form_value != record_value:
+            return _defect_report(
+                element, "Agentic", record_value, form_value), (
+                    element, "form field")
     return None, None
 
 
