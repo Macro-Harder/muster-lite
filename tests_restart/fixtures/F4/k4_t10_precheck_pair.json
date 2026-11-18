@@ -1,0 +1,136 @@
+{
+  "pair_name": "k4 check 10 part listed precheck pair",
+  "brief_source": "brief section 5.8.1, the paired fixtures paragraph; brief section 5.6.1, the limb partition for check 10",
+  "shared_inputs": {
+    "pinned_base_identity": {
+      "rule_base_name": "fixture-rule-base",
+      "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "byte_size": 2048
+    },
+    "tier_record": {
+      "file": "fixture-tier-record.md",
+      "tier_statement": "Low"
+    },
+    "roster_as_frozen_seat_by_seat": [
+      {
+        "seat_key": "seat-a",
+        "holder": "fixture-holder-a",
+        "round": 1,
+        "role": "fixture role a"
+      },
+      {
+        "seat_key": "seat-b",
+        "holder": "fixture-holder-b",
+        "round": 1,
+        "role": "fixture role b"
+      }
+    ]
+  },
+  "shared_inputs_identical_between_the_halves": true,
+  "precheck_half": {
+    "run_input": {
+      "build": "muster-lite-fixture-build",
+      "stage": "Step 13 fixture stage",
+      "run_kind": "precheck",
+      "runner_identity": "fixture-runner",
+      "runner_capacity": "fixture-capacity",
+      "shared_inputs": {
+        "pinned_base_identity": {
+          "rule_base_name": "fixture-rule-base",
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 2048
+        },
+        "tier_record": {
+          "file": "fixture-tier-record.md",
+          "tier_statement": "Low"
+        },
+        "roster_as_frozen_seat_by_seat": [
+          {
+            "seat_key": "seat-a",
+            "holder": "fixture-holder-a",
+            "round": 1,
+            "role": "fixture role a"
+          },
+          {
+            "seat_key": "seat-b",
+            "holder": "fixture-holder-b",
+            "round": 1,
+            "role": "fixture role b"
+          }
+        ]
+      },
+      "check_item": 10
+    },
+    "precheck_listing": [
+      {
+        "check": 10,
+        "standing": "listed in part",
+        "listed_limbs": [
+          "invocation limb, named by limb kind and waited for input only, waiting for the gate record"
+        ],
+        "run_limbs": [
+          "tier statement limb"
+        ]
+      }
+    ],
+    "expected": {
+      "check_10_check_result": null
+    }
+  },
+  "gate_half": {
+    "run_input": {
+      "build": "muster-lite-fixture-build",
+      "stage": "Step 13 fixture stage",
+      "run_kind": "gate run",
+      "runner_identity": "fixture-runner",
+      "runner_capacity": "fixture-capacity",
+      "shared_inputs": {
+        "pinned_base_identity": {
+          "rule_base_name": "fixture-rule-base",
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 2048
+        },
+        "tier_record": {
+          "file": "fixture-tier-record.md",
+          "tier_statement": "Low"
+        },
+        "roster_as_frozen_seat_by_seat": [
+          {
+            "seat_key": "seat-a",
+            "holder": "fixture-holder-a",
+            "round": 1,
+            "role": "fixture role a"
+          },
+          {
+            "seat_key": "seat-b",
+            "holder": "fixture-holder-b",
+            "round": 1,
+            "role": "fixture role b"
+          }
+        ]
+      },
+      "check_item": 10
+    },
+    "gate_time_additions": [
+      "the gate record",
+      "the gate roster",
+      "work products created after freeze"
+    ],
+    "gate_expectation_in_words": "the gate run runs in full every check, and every listed limb of a check, that the precheck half listed in its precheck section, for every listed limb whose waited for input stands in the gate fixture supplied set",
+    "precheck_listing_copied_beside_the_gate_half": [
+      {
+        "check": 10,
+        "standing": "listed in part",
+        "listed_limbs": [
+          "invocation limb, named by limb kind and waited for input only, waiting for the gate record"
+        ],
+        "run_limbs": [
+          "tier statement limb"
+        ]
+      }
+    ],
+    "expected": {
+      "check_10_runs_in_full": true
+    }
+  }
+}

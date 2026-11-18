@@ -1,0 +1,15 @@
+{
+  "source": "Authored at Step 13 from plan section 9 (the CannotStartOutcome type, DP-18): a closed field list.",
+  "type_name": "CannotStartOutcome",
+  "fields_in_order": [
+    "outcome word",
+    "kind",
+    "invocation as received",
+    "cause"
+  ],
+  "outcome_word": "CANNOT START",
+  "kind_values": [
+    "invocation",
+    "tool failure"
+  ]
+}

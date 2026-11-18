@@ -1,0 +1,76 @@
+{
+  "source": "Authored at Step 13 from plan section 10 (the Simple form fixed list, slot by slot) and brief section 5.7.3 (the fixed template, slots one to fourteen). Slot five stands in a precheck run only, so its gate run line is null.",
+  "record": "fixtures/F1/render_result_record.json",
+  "slots": [
+    {
+      "slot": 1,
+      "name": "title",
+      "expected_line": "Muster-lite staffing report"
+    },
+    {
+      "slot": 2,
+      "name": "standing grade sentence",
+      "expected_line": "Standing grade: grade L2 records checker."
+    },
+    {
+      "slot": 3,
+      "name": "stage, tier and pinned base line",
+      "expected_line": "Stage: Example build Stage 3. Tier applied: Low. Pinned base: base tables v1."
+    },
+    {
+      "slot": 4,
+      "name": "rollup line",
+      "expected_line": "Rollup: PASS"
+    },
+    {
+      "slot": 5,
+      "name": "precheck not yet run section",
+      "expected_line": null
+    },
+    {
+      "slot": 6,
+      "name": "build union state line",
+      "expected_line": "Build union: not computable in a one stage run, because the run reads no stage other than the one judged."
+    },
+    {
+      "slot": 7,
+      "name": "counts lines",
+      "expected_line": "Audit team: 4 counted, from 4 entries counted, 0 duplicates removed, 0 exempt or uncounted seats removed, against 3 required. Slack: 1."
+    },
+    {
+      "slot": 8,
+      "name": "runner identity and capacity line",
+      "expected_line": "Runner: runner-a. Capacity: standard."
+    },
+    {
+      "slot": 9,
+      "name": "standing limits lines",
+      "expected_line": "Standing limits: this report checks the records named in it and proves nothing beyond them."
+    },
+    {
+      "slot": 10,
+      "name": "roster match line",
+      "expected_line": "Roster match: the rosters match. Differing seats by kind: 0."
+    },
+    {
+      "slot": 11,
+      "name": "missing and duplicate seats in short form",
+      "expected_line": "Missing seats: none. Duplicate seats: none."
+    },
+    {
+      "slot": 12,
+      "name": "supplied set line with coverage statement and run receipt",
+      "expected_line": "Supplied set: 2 records needed, 2 supplied, 2 read. Receipt: roster.md, step-record.md."
+    },
+    {
+      "slot": 13,
+      "name": "consequence line",
+      "expected_line": "Consequence: the rollup may be cited as gate evidence for this stage only."
+    },
+    {
+      "slot": 14,
+      "name": "closing line",
+      "expected_line": "What this tool did not prove: that any agent was actually spawned, or that any work was done independently."
+    }
+  ]
+}

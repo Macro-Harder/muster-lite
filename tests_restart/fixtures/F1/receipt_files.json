@@ -1,0 +1,24 @@
+{
+  "source": "Authored at Step 13 from brief section 5.7.10 (the run receipt over read and unread files). Order: the order the coverage statement names the supplied set groups, and by path within each group.",
+  "read_files_in_receipt_order": [
+    {
+      "path": "roster.md",
+      "name": "roster.md",
+      "hash_form": "SHA-256 lowercase hexadecimal",
+      "byte_size": 120
+    },
+    {
+      "path": "step-record.md",
+      "name": "step-record.md",
+      "hash_form": "SHA-256 lowercase hexadecimal",
+      "byte_size": 96
+    }
+  ],
+  "offered_and_unread_files": [
+    {
+      "path": "spawn-export.md",
+      "stands_in": "the ignored inputs list only"
+    }
+  ],
+  "g47_bound_in_full": "the receipt settles nothing at register group G-47, the open item on editing of ordinary records after a claim. The receipt changes no verdict, proves nothing about when a file changed, proves nothing about who wrote a file, and imposes no hash or sequence requirement on any input contract. It is a record of what this run read, and of nothing else."
+}

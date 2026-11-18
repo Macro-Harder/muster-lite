@@ -1,0 +1,127 @@
+{
+  "pair_name": "k6 check 17 precheck pair",
+  "brief_source": "brief section 5.8.1, the paired fixtures paragraph; brief section 5.6.1, the precheck input table row for check 17, listed in full",
+  "shared_inputs": {
+    "pinned_base_identity": {
+      "rule_base_name": "fixture-rule-base",
+      "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "byte_size": 2048
+    },
+    "tier_record": {
+      "file": "fixture-tier-record.md",
+      "tier_statement": "Low"
+    },
+    "roster_as_frozen_seat_by_seat": [
+      {
+        "seat_key": "seat-a",
+        "holder": "fixture-holder-a",
+        "round": 1,
+        "role": "fixture role a"
+      },
+      {
+        "seat_key": "seat-b",
+        "holder": "fixture-holder-b",
+        "round": 1,
+        "role": "fixture role b"
+      }
+    ]
+  },
+  "shared_inputs_identical_between_the_halves": true,
+  "precheck_half": {
+    "run_input": {
+      "build": "muster-lite-fixture-build",
+      "stage": "Step 13 fixture stage",
+      "run_kind": "precheck",
+      "runner_identity": "fixture-runner",
+      "runner_capacity": "fixture-capacity",
+      "shared_inputs": {
+        "pinned_base_identity": {
+          "rule_base_name": "fixture-rule-base",
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 2048
+        },
+        "tier_record": {
+          "file": "fixture-tier-record.md",
+          "tier_statement": "Low"
+        },
+        "roster_as_frozen_seat_by_seat": [
+          {
+            "seat_key": "seat-a",
+            "holder": "fixture-holder-a",
+            "round": 1,
+            "role": "fixture role a"
+          },
+          {
+            "seat_key": "seat-b",
+            "holder": "fixture-holder-b",
+            "round": 1,
+            "role": "fixture role b"
+          }
+        ]
+      }
+    },
+    "precheck_listing": [
+      {
+        "check": 17,
+        "standing": "listed in full",
+        "waited_for_input": "the gate roster"
+      }
+    ],
+    "expected": {
+      "field_9": "not a gate run",
+      "check_17_listing": "listed in full at field 10",
+      "check_17_check_result": null,
+      "check_17_limb_result": null
+    }
+  },
+  "gate_half": {
+    "run_input": {
+      "build": "muster-lite-fixture-build",
+      "stage": "Step 13 fixture stage",
+      "run_kind": "gate run",
+      "runner_identity": "fixture-runner",
+      "runner_capacity": "fixture-capacity",
+      "shared_inputs": {
+        "pinned_base_identity": {
+          "rule_base_name": "fixture-rule-base",
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 2048
+        },
+        "tier_record": {
+          "file": "fixture-tier-record.md",
+          "tier_statement": "Low"
+        },
+        "roster_as_frozen_seat_by_seat": [
+          {
+            "seat_key": "seat-a",
+            "holder": "fixture-holder-a",
+            "round": 1,
+            "role": "fixture role a"
+          },
+          {
+            "seat_key": "seat-b",
+            "holder": "fixture-holder-b",
+            "round": 1,
+            "role": "fixture role b"
+          }
+        ]
+      }
+    },
+    "gate_time_additions": [
+      "the gate record",
+      "the gate roster",
+      "work products created after freeze"
+    ],
+    "gate_expectation_in_words": "the gate run runs in full every check, and every listed limb of a check, that the precheck half listed in its precheck section, for every listed limb whose waited for input stands in the gate fixture supplied set",
+    "precheck_listing_copied_beside_the_gate_half": [
+      {
+        "check": 17,
+        "standing": "listed in full",
+        "waited_for_input": "the gate roster"
+      }
+    ],
+    "expected": {
+      "check_17_runs_in_full": true
+    }
+  }
+}

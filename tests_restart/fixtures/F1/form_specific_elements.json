@@ -1,0 +1,31 @@
+{
+  "source": "Authored at Step 13 from brief section 5.7.2: the four named form specific elements and the forms that carry them. The Simple form carries none of the four.",
+  "elements": [
+    {
+      "name": "per check detail",
+      "forms": [
+        "Advanced"
+      ]
+    },
+    {
+      "name": "PASS evidence citations",
+      "forms": [
+        "Advanced",
+        "Agentic"
+      ]
+    },
+    {
+      "name": "PASS rollup header",
+      "forms": [
+        "Advanced"
+      ]
+    },
+    {
+      "name": "claim disagreement flags",
+      "forms": [
+        "Advanced"
+      ]
+    }
+  ],
+  "agentic_note": "In the Agentic form the claim comparison differences stand as the field 8 fields of the one result record, which is not the Advanced form claim disagreement flags element."
+}

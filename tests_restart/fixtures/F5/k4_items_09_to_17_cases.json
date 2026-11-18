@@ -1,0 +1,355 @@
+{
+  "cases": {
+    "t9_neither_form": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 9,
+        "distribution_form": "summary only"
+      },
+      "expected": {
+        "verdict": "NOT PROVEN",
+        "proven": false
+      }
+    },
+    "t9_named_slices_form": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 9,
+        "distribution_form": "by named slices"
+      },
+      "expected": {
+        "form_accepted": true
+      }
+    },
+    "t10_reduced_tier_no_invocation": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 10,
+        "reduced_tier_claim": true,
+        "invocation_records": 0
+      },
+      "expected": {
+        "verdict": "NOT PROVEN",
+        "missing_fact": "no invocation record stands in the target records"
+      }
+    },
+    "t10_precheck_check10": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "precheck",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 10
+      },
+      "expected": {
+        "check_result_for_check_10": null,
+        "limb_results_carry_run_limbs": true
+      }
+    },
+    "t11_label_no_basis": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 11,
+        "entry": {
+          "label": "exempt class named",
+          "basis": null
+        }
+      },
+      "expected": {
+        "counted_as_exempt": false,
+        "verdict": "NOT PROVEN"
+      }
+    },
+    "t11_basis_no_label": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 11,
+        "entry": {
+          "label": null,
+          "basis": "recorded basis named"
+        }
+      },
+      "expected": {
+        "counted_as_exempt": false,
+        "verdict": "NOT PROVEN"
+      }
+    },
+    "t12_no_author_record": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 12,
+        "author_record": null
+      },
+      "expected": {
+        "verdict": "NOT PROVEN",
+        "missing_fact_names": "author record field",
+        "resting_record_named": true
+      }
+    },
+    "t12_resting_record_outside": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 12,
+        "author_record": null,
+        "resting_record": "outside the supplied set"
+      },
+      "expected": {
+        "verdict": "NOT PROVEN",
+        "outside_standing_named_in_words": true
+      }
+    },
+    "t13_conflict": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 13,
+        "table_conflict": true
+      },
+      "expected": {
+        "field_13_statement_parts": [
+          "table",
+          "table entry and its figure",
+          "source and its figure",
+          "source wins"
+        ]
+      }
+    },
+    "t14_beside": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 14,
+        "colour_result": "NOT PROVEN"
+      },
+      "expected": {
+        "composes_rollup": false,
+        "position": "beside the rollup at field 13"
+      }
+    },
+    "t14_pass_rollup_stands": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 14,
+        "colour_result": "NOT PROVEN",
+        "all_composing": "PASS"
+      },
+      "expected": {
+        "rollup": "PASS"
+      }
+    },
+    "t14_present": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 14
+      },
+      "expected": {
+        "item_14_present": true
+      }
+    },
+    "t15_plaid_applied": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "tier_applied": "Plaid",
+        "tier_claimed": "Low"
+      },
+      "expected": {
+        "plaid_claim": true,
+        "field_13_carries": "Plaid refusal form at G13"
+      }
+    },
+    "t15_plaid_claimed_only": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "tier_applied": "Low",
+        "tier_claimed": "Plaid"
+      },
+      "expected": {
+        "plaid_claim": false
+      }
+    },
+    "t16_branch1": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "absence_branch": 1
+      },
+      "expected": {
+        "affected_word": "UNVERIFIABLE"
+      }
+    },
+    "t16_branch2": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "absence_branch": 2
+      },
+      "expected": {
+        "affected_word": "UNVERIFIABLE",
+        "missing_identification_named": true
+      }
+    },
+    "t16_branch3": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "absence_branch": 3
+      },
+      "expected": {
+        "affected_word": "NOT PROVEN",
+        "missing_product_named": true
+      }
+    },
+    "t16_branch5": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "absence_branch": 5
+      },
+      "expected": {
+        "affected_word": "UNVERIFIABLE"
+      }
+    },
+    "t16_branch6": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "absence_branch": 6
+      },
+      "expected": {
+        "verification_complete": false
+      }
+    },
+    "t16_pointer": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "absence_pointer_table": true
+      },
+      "expected": {
+        "pointer_table_stands": true
+      }
+    },
+    "t16_unreadable_coverage": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "unreadable_split": "coverage side"
+      },
+      "expected": {
+        "affected_word": "NOT PROVEN"
+      }
+    },
+    "t16_unreadable_missing": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "unreadable_split": "missing records side"
+      },
+      "expected": {
+        "affected_word": "UNVERIFIABLE"
+      }
+    },
+    "t16_item18": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 18
+      },
+      "expected": {
+        "check_result_for_item_18": null
+      }
+    },
+    "t17_check12": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "precheck",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "check_item": 12
+      },
+      "expected": {
+        "check_result_for_check_12": null,
+        "listed_limbs_at_field_10": true
+      }
+    }
+  }
+}

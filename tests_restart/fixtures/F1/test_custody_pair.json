@@ -1,0 +1,10 @@
+{
+  "source": "Authored at Step 13 from brief section 5.7.9 (the test custody pair): a fixture result record and a generated form the harness corrupts between generation and comparison. Test custody only; no live run corruption.",
+  "result_record": "fixtures/F1/render_result_record.json",
+  "generated_form_element": "counts lines",
+  "value_in_result_record": "4 counted, from 4 entries counted, 0 duplicates removed, 0 exempt or uncounted seats removed, against 3 required. Slack: 1.",
+  "value_in_generated_form_before_corruption": "4 counted, from 4 entries counted, 0 duplicates removed, 0 exempt or uncounted seats removed, against 3 required. Slack: 1.",
+  "value_in_generated_form_after_corruption": "3 counted, from 4 entries counted, 0 duplicates removed, 0 exempt or uncounted seats removed, against 3 required. Slack: 1.",
+  "location_in_result_record": "counts lines, contract field 7",
+  "location_in_generated_form": "counts lines, Simple form slot seven"
+}

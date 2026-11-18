@@ -1,0 +1,25 @@
+{
+  "source": "Authored at Step 13 from brief section 5.7.9 (the defect report form) and plan section 5, shape 16.",
+  "expected": {
+    "fields": [
+      "form agreement check name",
+      "rule at G23",
+      "element that disagreed",
+      "value in the result record, with its location",
+      "value in the generated form, with its location",
+      "defect field"
+    ],
+    "defect_field_word": "UNVERIFIABLE",
+    "defect_word_stands_in_no_rollup_position": true,
+    "tool_defect_statement": "This disagreement is a defect in the tool and not a finding about the stage records.",
+    "repair_act": "a tool repair, not a restaffing act",
+    "one_report_per_disagreement": true,
+    "no_form_printed_on_a_disagreement": true
+  },
+  "wrong": {
+    "one_report_covering_two_disagreements": true,
+    "defect_word_in_rollup_position": "UNVERIFIABLE",
+    "tool_defect_statement": null,
+    "note": "Wrong fixture: one report covering two disagreements, the defect word standing in a rollup position, and the tool defect statement missing. Differs from the expected fixture in exactly those respects, the respects group F10-T7 names."
+  }
+}

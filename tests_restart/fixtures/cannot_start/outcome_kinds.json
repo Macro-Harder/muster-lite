@@ -1,0 +1,30 @@
+{
+  "source": "Authored at Step 13 from plan section 9: the five outcome kinds, each returned in its own form (group P8-T4).",
+  "kinds": [
+    {
+      "kind": 1,
+      "name": "completed gate run",
+      "form": "one ComputedResult and its printed forms, or defect reports under kind 4"
+    },
+    {
+      "kind": 2,
+      "name": "open case run",
+      "form": "a result record carrying the OPEN CASE state and no rollup word"
+    },
+    {
+      "kind": 3,
+      "name": "precheck run under the listed not run condition",
+      "form": "a result record with no rollup word and the precheck words at contract field 12, with its label and consequence line"
+    },
+    {
+      "kind": 4,
+      "name": "form agreement disagreement",
+      "form": "DefectReports and no form, a completed run with a tool defect"
+    },
+    {
+      "kind": 5,
+      "name": "cannot start run",
+      "form": "a CannotStartOutcome and no result record"
+    }
+  ]
+}

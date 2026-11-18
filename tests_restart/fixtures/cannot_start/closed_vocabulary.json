@@ -1,0 +1,12 @@
+{
+  "source": "Authored at Step 13 from plan section 9, mechanical check 1: the closed list for outcome, verdict, rollup, header and marker positions.",
+  "result_bearing_words": [
+    "PASS",
+    "FAIL",
+    "NOT PROVEN",
+    "UNVERIFIABLE"
+  ],
+  "open_case_state": "OPEN CASE, in its brief section 5.4.2 positions only",
+  "cannot_start_outcome_word": "CANNOT START",
+  "cannot_start_positions_carry_no_verdict_word": true
+}

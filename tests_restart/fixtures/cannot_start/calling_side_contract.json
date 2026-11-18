@@ -1,0 +1,15 @@
+{
+  "source": "Authored at Step 13 from plan section 9 (the calling side contract, grill G33 and brief section 8.3).",
+  "cannot_start_outcome_is_distinct_from": [
+    "PASS",
+    "FAIL",
+    "NOT PROVEN",
+    "UNVERIFIABLE"
+  ],
+  "consumer_records_it_as": "a call that did not run",
+  "consumer_may_not_map_it_to": [
+    "PASS",
+    "FAIL",
+    "any verdict word"
+  ]
+}

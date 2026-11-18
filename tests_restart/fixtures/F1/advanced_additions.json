@@ -1,0 +1,19 @@
+{
+  "source": "Authored at Step 13 from brief section 5.7.4 (the Advanced form additions, closed list) as plan section 10 states them, in the canonical order of brief section 5.7.2 and plan section 10.",
+  "additions_in_canonical_sequence": [
+    "full repair list",
+    "full bounds list",
+    "per check detail",
+    "PASS evidence citations",
+    "PASS rollup header",
+    "claim disagreement flags"
+  ],
+  "required_by": {
+    "full repair list": "grill G26",
+    "full bounds list": "brief section 5.7.4",
+    "per check detail": "grill G24 fixed field set",
+    "PASS evidence citations": "brief section 5.7.7",
+    "PASS rollup header": "brief section 5.7.8, where the rollup is PASS",
+    "claim disagreement flags": "brief section 5.7.4"
+  }
+}

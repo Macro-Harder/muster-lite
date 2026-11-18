@@ -1,0 +1,12 @@
+{
+  "source": "Authored at Step 13 from brief section 5.7.6 and plan section 10 (precheck presentation): label and consequence line in every form, no bare precheck verdict in a rollup line, and no rollup word where the listed not run condition stands.",
+  "precheck_label": "Precheck",
+  "precheck_consequence_line": "Consequence: a precheck is not a gate run and classifies no stage.",
+  "listed_not_run_condition": "a composing check stands listed as not run in whole or a limb that composes under the limb composing rule stands listed as not run",
+  "rollup_line_under_listed_not_run": "Precheck. No rollup stands, because a composing check has not run.",
+  "forms": [
+    "Simple",
+    "Advanced",
+    "Agentic"
+  ]
+}

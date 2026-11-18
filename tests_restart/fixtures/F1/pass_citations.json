@@ -1,0 +1,11 @@
+{
+  "source": "Authored at Step 13 from plan section 5, shape 8 locations, and brief section 5.7.7: each PASS check cites the roster line location and, where linkage passed, the artefact author record line location; where linkage did not pass or did not apply, the second location stands in words.",
+  "pass_check": {
+    "check": "check 1",
+    "verdict": "PASS",
+    "first_location": "roster.md line 4",
+    "second_location_where_linkage_passed": "artefact.md line 9",
+    "second_location_in_words_where_linkage_did_not_pass_or_apply": "not applicable: linkage did not pass for this seat"
+  },
+  "simple_form_carries_no_citation_beyond_its_template": true
+}

@@ -1,0 +1,131 @@
+{
+  "pair_name": "k5 t4 recording capacity pair first form",
+  "brief_source": "brief section 5.8.1, the precheck result record claim point fixture and the precheck result record claim passage outside recording capacity fixture, first form; brief section 5.5, item 16, the precheck result record claim points paragraph, naming the six recording fields; brief section 5.4, shape 17, the RecordedPrecheck matching rule; brief section 5.6.2, the D12 element",
+  "expected_fixture": {
+    "run_input": {
+      "build": "muster-lite-fixture-build",
+      "stage": "Step 13 fixture stage",
+      "run_kind": "gate run",
+      "runner_identity": "fixture-runner",
+      "runner_capacity": "fixture-capacity",
+      "recording_capacity_only": true,
+      "form": "first",
+      "recording_record": {
+        "stage_it_was_run_for": "Step 13 fixture stage",
+        "frozen_roster_it_was_recorded_for": {
+          "roster_record_file": "fixture-frozen-roster.md",
+          "roster_standing": "frozen roster"
+        },
+        "content_binding_for_that_frozen_roster_as_frozen": {
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 512
+        },
+        "runner_identity_as_recorded": "fixture-precheck-runner",
+        "runner_capacity_as_recorded": "coordinator as precheck",
+        "precheck_result_as_recorded": "NOT PROVEN",
+        "recorded_rollup_content": "NOT PROVEN"
+      },
+      "matching_facts_at_brief_section_5_4_shape_17": {
+        "stage_equals_the_stage_judged": true,
+        "roster_record_file_equals_the_file_of_the_frozen_roster_record_instance_the_gate_run_compares": true,
+        "content_binding_equals_the_hash_and_byte_size_of_that_frozen_roster_file_as_it_stands_in_the_supplied_set": true,
+        "matching_rule": "brief section 5.4, shape 17"
+      },
+      "gate_run_rollup_position_content": "PASS"
+    },
+    "expected": {
+      "difference_raised": false,
+      "difference_at_contract_field_8": null,
+      "difference_on_recording_capacity_alone": false,
+      "d12_carrying": "carried in the D12 element at section 5.6.2 as recorded",
+      "false_fail": false,
+      "criterion": "AC-P5"
+    }
+  },
+  "wrong_fixture": {
+    "run_input": {
+      "build": "muster-lite-fixture-build",
+      "stage": "Step 13 fixture stage",
+      "run_kind": "gate run",
+      "runner_identity": "fixture-runner",
+      "runner_capacity": "fixture-capacity",
+      "recording_capacity_only": true,
+      "form": "first",
+      "recording_record": {
+        "stage_it_was_run_for": "Step 13 fixture stage",
+        "frozen_roster_it_was_recorded_for": {
+          "roster_record_file": "fixture-frozen-roster.md",
+          "roster_standing": "frozen roster"
+        },
+        "content_binding_for_that_frozen_roster_as_frozen": {
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 512
+        },
+        "runner_identity_as_recorded": "fixture-precheck-runner",
+        "runner_capacity_as_recorded": "coordinator as precheck",
+        "precheck_result_as_recorded": "NOT PROVEN",
+        "recorded_rollup_content": "NOT PROVEN"
+      },
+      "matching_facts_at_brief_section_5_4_shape_17": {
+        "stage_equals_the_stage_judged": true,
+        "roster_record_file_equals_the_file_of_the_frozen_roster_record_instance_the_gate_run_compares": true,
+        "content_binding_equals_the_hash_and_byte_size_of_that_frozen_roster_file_as_it_stands_in_the_supplied_set": true,
+        "matching_rule": "brief section 5.4, shape 17"
+      },
+      "gate_run_rollup_position_content": "PASS"
+    },
+    "wrong_output": {
+      "difference_raised": true,
+      "ground": "recording capacity alone"
+    }
+  },
+  "outside_fields_fixture": {
+    "run_input": {
+      "build": "muster-lite-fixture-build",
+      "stage": "Step 13 fixture stage",
+      "run_kind": "gate run",
+      "runner_identity": "fixture-runner",
+      "runner_capacity": "fixture-capacity",
+      "passage_outside_recording_fields": true,
+      "form": "first",
+      "recording_record": {
+        "stage_it_was_run_for": "Step 13 fixture stage",
+        "frozen_roster_it_was_recorded_for": {
+          "roster_record_file": "fixture-frozen-roster.md",
+          "roster_standing": "frozen roster"
+        },
+        "content_binding_for_that_frozen_roster_as_frozen": {
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 512
+        },
+        "runner_identity_as_recorded": "fixture-precheck-runner",
+        "runner_capacity_as_recorded": "coordinator as precheck",
+        "precheck_result_as_recorded": "NOT PROVEN",
+        "recorded_rollup_content": "NOT PROVEN"
+      },
+      "matching_facts_at_brief_section_5_4_shape_17": {
+        "stage_equals_the_stage_judged": true,
+        "roster_record_file_equals_the_file_of_the_frozen_roster_record_instance_the_gate_run_compares": true,
+        "content_binding_equals_the_hash_and_byte_size_of_that_frozen_roster_file_as_it_stands_in_the_supplied_set": true,
+        "matching_rule": "brief section 5.4, shape 17"
+      },
+      "passage_outside_the_six_recording_fields": {
+        "claim_kind": "stage kind",
+        "claim_figure_for_the_stage_kind": 9,
+        "generated_statement_figure_for_the_stage_kind": 5,
+        "standing": "the passage, read as a claim point, contradicts a point of the GeneratedStaffingStatement"
+      }
+    },
+    "expected": {
+      "difference_raised": true,
+      "kind": "ordinary difference",
+      "difference_direction": "first direction of the comparison, a claim point contradicting a point of the GeneratedStaffingStatement",
+      "difference_verdict": "FAIL",
+      "difference_composing_result_at": "contract field 6",
+      "difference_printed_among_the_differences_at": "contract field 8",
+      "difference_on_recording_capacity_alone": false,
+      "d12_carrying": "carried in the D12 element at section 5.6.2 as recorded, for its recording capacity",
+      "criterion": "AC-P5"
+    }
+  }
+}

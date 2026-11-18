@@ -1,0 +1,18 @@
+{
+  "source": "Authored at Step 13 from plan section 12: the shipped staffed roster fixture of family F1, the base membership set at brief section 5.8.1 in miniature. Its expected result stands beside it, fixed before code under grill G31.",
+  "roster": {
+    "build": "Example build",
+    "stage": "Stage 3",
+    "teams": [
+      {
+        "team": "Audit team",
+        "required_count": 3,
+        "entries_counted": 4,
+        "duplicates_removed": 0,
+        "exempt_or_uncounted_removed": 0,
+        "counted_total": 4
+      }
+    ]
+  },
+  "expected_rollup": "PASS"
+}

@@ -1,0 +1,32 @@
+{
+  "source": "Authored at Step 13 from plan section 9, check 4. These fixtures stand beside the regression set and join neither named group at brief section 5.8.2.",
+  "cases": [
+    {
+      "case": "runner capacity outside the brief section 5.2 values",
+      "invocation": {
+        "runner_capacity": "a capacity value outside the stated values"
+      }
+    },
+    {
+      "case": "a supplied file entry carrying no input group",
+      "invocation": {
+        "supplied_file_entry": {
+          "path": "roster.md",
+          "input_group": null
+        }
+      }
+    },
+    {
+      "case": "a tool failure before a result record stands",
+      "invocation": {
+        "tool_failure_before_result": true
+      }
+    }
+  ],
+  "expected_for_each_case": {
+    "result_record": null,
+    "verdict_word": null,
+    "rollup_word": null,
+    "recorded_as": "a call that did not run"
+  }
+}

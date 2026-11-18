@@ -1,0 +1,31 @@
+{
+  "source": "Authored at Step 13 from plan section 8, slice 8, group P8-T2, over the F1 rendering fixtures: one disagreement in one element of one form, and one element in each of two forms.",
+  "cases": [
+    {
+      "case": "one element in one form",
+      "disagreements": [
+        {
+          "form": "Simple",
+          "element": "counts lines"
+        }
+      ],
+      "expected_reports": 1
+    },
+    {
+      "case": "one element in each of two forms",
+      "disagreements": [
+        {
+          "form": "Simple",
+          "element": "counts lines"
+        },
+        {
+          "form": "Advanced",
+          "element": "rollup line"
+        }
+      ],
+      "expected_reports": 2
+    }
+  ],
+  "no_form_printed_in_that_run": true,
+  "comparison_continues_after_first_disagreement": true
+}

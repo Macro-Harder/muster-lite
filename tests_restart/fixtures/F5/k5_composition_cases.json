@@ -1,0 +1,277 @@
+{
+  "brief_source": "brief section 5.5, the composition table, rows 1 to 5, and the five composition laws; brief section 5.8.1, the composition property fixtures, tested under AC-P12",
+  "cases": {
+    "row1": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composition_row": 1,
+        "run_meets_an_open_case": true,
+        "composing_check_words": []
+      },
+      "expected": {
+        "row_governs": 1,
+        "rollup": null,
+        "field_12_carries": "no rollup word, and the words form statement naming the open case",
+        "composition_table_row": "Row 1, open case: where the run meets an open case under section 5.4.2, contract field 12 carries no rollup word and carries the words form statement naming the open case."
+      }
+    },
+    "row2": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composition_row": 2,
+        "composing_check_words": [
+          "FAIL",
+          "PASS"
+        ]
+      },
+      "expected": {
+        "row_governs": 2,
+        "rollup": "FAIL",
+        "composition_table_row": "Row 2, proven failure: where any composing check takes FAIL, contract field 12 carries FAIL, composed under the D16 order."
+      }
+    },
+    "row3": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composition_row": 3,
+        "plaid_claim_stands": true,
+        "composing_check_words": [
+          "PASS",
+          "NOT PROVEN"
+        ]
+      },
+      "expected": {
+        "row_governs": 3,
+        "rollup": "UNVERIFIABLE",
+        "composition_table_row": "Row 3, Plaid bound: where no composing check takes FAIL and a Plaid claim stands, contract field 12 carries UNVERIFIABLE, and no PASS rollup stands on a Plaid claim. Case two: where no composing check takes UNVERIFIABLE, the word stands as the bound outcome at item 15 only and not by composition."
+      }
+    },
+    "row4": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composition_row": 4,
+        "composing_check_words": [
+          "PASS",
+          "NOT PROVEN"
+        ]
+      },
+      "expected": {
+        "row_governs": 4,
+        "rollup": "NOT PROVEN",
+        "composition_table_row": "Row 4, composed word: otherwise, where no earlier row matches, contract field 12 carries the first word in the order FAIL, then UNVERIFIABLE, then NOT PROVEN, then PASS, that any composing check takes."
+      }
+    },
+    "row5": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composition_row": 5,
+        "composing_check_words": [
+          "PASS",
+          "PASS"
+        ]
+      },
+      "expected": {
+        "row_governs": 5,
+        "rollup": "PASS",
+        "composition_table_row": "Row 5, all pass: PASS stands only where every composing check is PASS."
+      }
+    },
+    "law_order": {
+      "run_input_a": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "FAIL",
+          "PASS",
+          "NOT PROVEN"
+        ],
+        "listing_order": [
+          "check a",
+          "check b",
+          "check c"
+        ]
+      },
+      "run_input_b": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "NOT PROVEN",
+          "PASS",
+          "FAIL"
+        ],
+        "listing_order": [
+          "check c",
+          "check b",
+          "check a"
+        ]
+      },
+      "expected": {
+        "law": "order of listing",
+        "rollup_a": "FAIL",
+        "rollup_b": "FAIL",
+        "relation": "the same rollup in both runs",
+        "brief_fixture": "A listing order property fixture: the same composing set of checks presented in two listing orders in two runs, expected at the same rollup in both runs, tested under AC-P12."
+      }
+    },
+    "law_grouping": {
+      "run_input_a": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "FAIL",
+          "PASS"
+        ],
+        "grouping": null
+      },
+      "run_input_b": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "FAIL",
+          "PASS"
+        ],
+        "grouping": {
+          "team one": [
+            "FAIL"
+          ],
+          "team two": [
+            "PASS"
+          ]
+        }
+      },
+      "expected": {
+        "law": "grouping",
+        "rollup_a": "FAIL",
+        "rollup_b": "FAIL",
+        "relation": "the same rollup in both runs, as the rollup of the whole set",
+        "brief_fixture": "A grouping property fixture: the same composing set of checks presented grouped by team in one run and not grouped in another run, expected at the same rollup in both runs, as the rollup of the whole set, tested under AC-P12."
+      }
+    },
+    "law_pass": {
+      "run_input_a": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "NOT PROVEN"
+        ]
+      },
+      "run_input_b": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "NOT PROVEN",
+          "PASS"
+        ]
+      },
+      "expected": {
+        "law": "PASS identity",
+        "rollup_a": "NOT PROVEN",
+        "rollup_b": "NOT PROVEN",
+        "relation": "the same rollup in both runs",
+        "brief_fixture": "A PASS identity property fixture: the same composing set of checks in two runs, the second run adding a composing PASS check to that set, expected at the same rollup in both runs, tested under AC-P12."
+      }
+    },
+    "law_monotonicity": {
+      "run_input_a": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "PASS"
+        ]
+      },
+      "run_input_b": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "NOT PROVEN"
+        ]
+      },
+      "expected": {
+        "law": "monotonicity",
+        "rollup_a": "PASS",
+        "rollup_b": "NOT PROVEN",
+        "relation": "the rollup in the second run never improves on the rollup in the first run, the one composing word standing weakened along the D16 order, from PASS toward FAIL",
+        "brief_fixture": "A monotonicity property fixture: two runs on the same composing set, in which one composing word in the second run stands weakened along the D16 order, from PASS toward FAIL, against the first run, expected at a rollup in the second run that never improves on the rollup in the first run, tested under AC-P12."
+      }
+    },
+    "law_isolation": {
+      "run_input_a": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "PASS"
+        ],
+        "non_composing_check_words": [
+          "FAIL"
+        ]
+      },
+      "run_input_b": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "composing_check_words": [
+          "PASS"
+        ],
+        "non_composing_check_words": [
+          "NOT PROVEN"
+        ]
+      },
+      "expected": {
+        "law": "isolation",
+        "rollup_a": "PASS",
+        "rollup_b": "PASS",
+        "relation": "the same rollup in both runs, a word from a check marked non composing never entering the operation, and the varied word not being the Plaid bound outcome acting through row 3",
+        "brief_fixture": "An isolation property fixture: two runs on the same composing set, in which a word from a check marked non composing varies between the first run and the second run, and that word is not the Plaid bound outcome acting through row 3, expected at the same rollup in both runs, tested under AC-P12."
+      }
+    }
+  }
+}

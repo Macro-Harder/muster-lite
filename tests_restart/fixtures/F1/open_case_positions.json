@@ -1,0 +1,14 @@
+{
+  "source": "Authored at Step 13 from brief section 5.4.2: the OPEN CASE state stands only in the verdict position of an affected check and, for the words alone case, in the base position at contract field 4; contract field 12 carries no rollup word in an open case run that is not a precheck.",
+  "allowed_positions": [
+    "verdict position of an affected check",
+    "base position at contract field 4, words alone case only"
+  ],
+  "field_12_in_open_case_run_not_precheck": "Rollup not stated. This run meets an open case, named here, and the single result for that case stands open.",
+  "verdict_words": [
+    "PASS",
+    "FAIL",
+    "NOT PROVEN",
+    "UNVERIFIABLE"
+  ]
+}

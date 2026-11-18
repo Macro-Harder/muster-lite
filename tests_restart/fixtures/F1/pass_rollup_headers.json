@@ -1,0 +1,17 @@
+{
+  "source": "Authored at Step 13 from brief section 5.7.8 (the PASS rollup header, figured and words only forms).",
+  "figured_header": {
+    "stands_where": "the rollup is PASS and a slack figure stands for at least one TeamCount in the result",
+    "names": "the smallest slack value in the stage and each team at that value",
+    "slack_figures_in_the_same_report": {
+      "Audit team": 1
+    }
+  },
+  "words_only_header": {
+    "text": "PASS rollup. No team count stands in this stage, and no smallest slack stands.",
+    "stands_where": "the rollup is PASS and no TeamCount stands in the result for the stage",
+    "uses_no_figure": true,
+    "names_no_team": true
+  },
+  "no_header_where_rollup_is_not_pass": true
+}

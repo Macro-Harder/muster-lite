@@ -1,0 +1,8 @@
+{
+  "source": "Authored at Step 13 from plan section 9 (the exit codes table, option X1, and the DP-13 mapping).",
+  "cannot_start_codes": {
+    "1": "CANNOT START, kind invocation. No verdict and no rollup. No result record.",
+    "2": "CANNOT START, kind tool failure. No verdict and no rollup. No result record."
+  },
+  "codes_associated_with_verdicts_or_rollups": []
+}

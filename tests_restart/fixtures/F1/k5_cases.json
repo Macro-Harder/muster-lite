@@ -1,0 +1,250 @@
+{
+  "cases": {
+    "t1_point_from_claim_only": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "generated_point": "point stated only in the written claim"
+      },
+      "expected": {
+        "generated_statement_contains_point": false
+      }
+    },
+    "t1_generation_without_claim_read": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity"
+      },
+      "expected": {
+        "generation_read_claim": false
+      }
+    },
+    "t2_claim_point_no_generated": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "direction": "claim point with no generated point"
+      },
+      "expected": {
+        "difference_carried": true
+      }
+    },
+    "t2_generated_point_no_claim": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "direction": "generated point no claim mentions"
+      },
+      "expected": {
+        "difference_carried": true
+      }
+    },
+    "t2_build_union": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "build_union_claim_figure": 39
+      },
+      "expected": {
+        "state": "not computable in a one stage run",
+        "figure_printed": false,
+        "claim_point_verdict": "NOT PROVEN"
+      }
+    },
+    "t2_trace_below_100": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "trace_standing": "below 100 percent LANDED"
+      },
+      "expected": {
+        "field_13_carries": "trace standing bound",
+        "reported_as_closed": false
+      }
+    },
+    "t3_kindless": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "claim_kind": "not stated",
+        "figure": 4
+      },
+      "expected": {
+        "verdict": "NOT PROVEN",
+        "false_fail": false
+      }
+    },
+    "t3_unknown_kind": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "claim_kind": "cohort",
+        "figure": 9,
+        "computed": {
+          "stage": 5,
+          "unit": 2,
+          "rollup": 5
+        }
+      },
+      "expected": {
+        "verdict": "NOT PROVEN",
+        "unknown_kind_named": "cohort",
+        "numeric_disagreement_printed": false
+      }
+    },
+    "t3_unguessable": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "claim_passage": "not parseable without guessing"
+      },
+      "expected": {
+        "verdict": "NOT PROVEN",
+        "guessed_reading_printed": false
+      }
+    },
+    "t5_open_case_rollup": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "open_case": true
+      },
+      "expected": {
+        "field_12_carries_rollup_word": false
+      }
+    },
+    "t5_bound_position": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity"
+      },
+      "expected": {
+        "bounds_stand_at": "field 13"
+      }
+    },
+    "t6_missing_seat": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "entry_kind": "missing seat"
+      },
+      "expected": {
+        "cure_act": "seat a distinct agent, holding no other seat in the stage, in the named seat, and record that holding in the roster record"
+      }
+    },
+    "t6_duplicate_holding": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "entry_kind": "duplicate holding"
+      },
+      "expected": {
+        "cure_act": "No restaffing act cures this entry; the cure is to remove the duplicate holding from the roster record so the agent holds one seat in the stage."
+      }
+    },
+    "t6_unproven_absent_record": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "entry_kind": "unproven seat",
+        "proof_failure": "absent or unreadable record"
+      },
+      "expected": {
+        "cure_act": "No restaffing act cures this entry; the cure is to supply the named record in readable form in the supplied set."
+      }
+    },
+    "t6_unproven_other_reason": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "entry_kind": "unproven seat",
+        "proof_failure": "other stated reason",
+        "missing_fact": "author record field"
+      },
+      "expected": {
+        "cure_act_form": "supply or correct the named fact, with the fact named: author record field"
+      }
+    },
+    "t7_absent_file": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "open_case": "single absent file",
+        "absent_file": "claim-bearing-file-a.md"
+      },
+      "expected": {
+        "fields_1_to_5_as_usual": true,
+        "affected_verdict_position": "OPEN CASE",
+        "field_8_difference_for_absent_file": null,
+        "field_11_repair_for_affected": null,
+        "field_12_rollup_word": null,
+        "field_13_carries": "open case statement"
+      }
+    },
+    "t7_words_alone": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "open_case": "words alone base"
+      },
+      "expected": {
+        "base_line": "OPEN CASE, pinned base identified in words alone, result open at section 5.3",
+        "field_4_base_position": "OPEN CASE",
+        "affected_verdict_position": "OPEN CASE",
+        "field_12_rollup_word": null,
+        "base_position_name_hash_bytesize_line": null
+      }
+    }
+  }
+}

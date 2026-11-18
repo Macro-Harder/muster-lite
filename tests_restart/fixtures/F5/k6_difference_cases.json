@@ -1,0 +1,390 @@
+{
+  "cases": {
+    "added_seat": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "difference_kind": "added seat"
+      },
+      "expected": {
+        "differing_seats": [
+          {
+            "kind": "added seat",
+            "seat_key": "seat-b"
+          }
+        ]
+      }
+    },
+    "removed_seat": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "difference_kind": "removed seat"
+      },
+      "expected": {
+        "differing_seats": [
+          {
+            "kind": "removed seat",
+            "seat_key": "seat-a"
+          }
+        ]
+      }
+    },
+    "changed_holder": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "difference_kind": "changed holder"
+      },
+      "expected": {
+        "differing_seats": [
+          {
+            "kind": "changed holder",
+            "seat_key": "seat-a"
+          }
+        ]
+      }
+    },
+    "removed_added_pair": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "difference_kind": "removed and added pair"
+      },
+      "expected": {
+        "differing_seats": [
+          {
+            "kind": "removed seat",
+            "seat_key": "seat-a"
+          },
+          {
+            "kind": "added seat",
+            "seat_key": "seat-a"
+          }
+        ]
+      }
+    },
+    "rekeyed": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "difference_kind": "rekeyed configuration"
+      },
+      "expected": {
+        "differing_seats": [
+          {
+            "kind": "removed seat",
+            "seat_key": "seat-old"
+          },
+          {
+            "kind": "added seat",
+            "seat_key": "seat-new"
+          }
+        ],
+        "tied": false
+      }
+    },
+    "row1": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "tying": {
+          "satisfying": 2,
+          "non_matching": 0
+        }
+      },
+      "expected": {
+        "classification": "unexplained",
+        "row": 1
+      }
+    },
+    "row2": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "tying": {
+          "satisfying": 1,
+          "non_matching": 1
+        }
+      },
+      "expected": {
+        "classification": "unexplained",
+        "row": 2
+      }
+    },
+    "row3": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "tying": {
+          "satisfying": 1,
+          "non_matching": 0
+        }
+      },
+      "expected": {
+        "classification": "tied",
+        "row": 3
+      }
+    },
+    "row4": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "tying": {
+          "satisfying": 0,
+          "non_matching": 0,
+          "holder_kind": "placeholder"
+        }
+      },
+      "expected": {
+        "classification": "unexplained",
+        "row": 4,
+        "missing_fact_names": "holder kind"
+      }
+    },
+    "shared_record": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "tying": {
+          "shared_record_for_two_seats": true
+        }
+      },
+      "expected": {
+        "shared_record_cited_and_named_as_shared": true,
+        "one_record_ties_two_seats": false
+      }
+    },
+    "companion_pair": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "tying": {
+          "pair_sentinel_records": 2
+        }
+      },
+      "expected": {
+        "classification_per_seat": "tied on its own counts"
+      }
+    },
+    "fail_claim": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "limb": "claim standing read and contradicted"
+      },
+      "expected": {
+        "verdict": "FAIL"
+      }
+    },
+    "no_claim": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "limb": "no claim standing"
+      },
+      "expected": {
+        "verdict": "NOT PROVEN"
+      }
+    },
+    "unreadable_claim": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "limb": "claim passage cannot be read without guessing"
+      },
+      "expected": {
+        "verdict": "NOT PROVEN"
+      }
+    },
+    "honest_reseat_outside": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "limb": "honest reseat record outside the supplied set"
+      },
+      "expected": {
+        "verdict": "NOT PROVEN"
+      }
+    },
+    "frozen_absent": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "limb": "frozen roster absence"
+      },
+      "expected": {
+        "verdict": "UNVERIFIABLE"
+      }
+    },
+    "gate_absent": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "limb": "gate instance absence"
+      },
+      "expected": {
+        "verdict": "UNVERIFIABLE",
+        "field_9_carries": "gate instance absence in words"
+      }
+    },
+    "same_standing_twice": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "limb": "two records stating the same standing"
+      },
+      "expected": {
+        "verdict": "UNVERIFIABLE"
+      }
+    },
+    "dup_frozen": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "duplicated_seat_key": "frozen side",
+        "frozen_roster": [
+          {
+            "seat_key": "K",
+            "holder": "A",
+            "round": 1
+          },
+          {
+            "seat_key": "K",
+            "holder": "B",
+            "round": 2
+          }
+        ],
+        "gate_roster": [
+          {
+            "seat_key": "K",
+            "holder": "C",
+            "round": 1
+          }
+        ],
+        "reseat_records": [
+          {
+            "seat_key": "K",
+            "prior_holder": "A",
+            "new_holder": "C",
+            "round": 1,
+            "file": "fixture-reseat-record.md",
+            "line_location": "fixture-reseat-record.md line 1"
+          }
+        ],
+        "claim_standing": "no staffing claim standing read in a named claim bearing file"
+      },
+      "expected": {
+        "paired_first": "one changed holder differing seat tied under the third row of the tying rule, with that record cited by file and line location",
+        "unpaired_second": "one removed seat differing seat named as unexplained under the fourth row of the tying rule, on that seat own counts and not on counts taken over the seat key as a whole",
+        "check_17_verdict": "NOT PROVEN",
+        "criterion": "AC-P14",
+        "brief_fixture": "A duplicated seat key fixture, frozen side form, at brief section 5.8.1"
+      }
+    },
+    "dup_gate": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "duplicated_seat_key": "gate side",
+        "frozen_roster": [
+          {
+            "seat_key": "K",
+            "holder": "A",
+            "round": 1
+          }
+        ],
+        "gate_roster": [
+          {
+            "seat_key": "K",
+            "holder": "C",
+            "round": 1
+          },
+          {
+            "seat_key": "K",
+            "holder": "D",
+            "round": 2
+          }
+        ],
+        "reseat_records": [
+          {
+            "seat_key": "K",
+            "prior_holder": "A",
+            "new_holder": "C",
+            "round": 1,
+            "file": "fixture-reseat-record.md",
+            "line_location": "fixture-reseat-record.md line 1"
+          }
+        ],
+        "claim_standing": "no staffing claim standing read in a named claim bearing file"
+      },
+      "expected": {
+        "paired_first": "one changed holder differing seat tied under the third row of the tying rule, with that record cited by file and line location",
+        "unpaired_second": "one added seat differing seat named as unexplained under the fourth row of the tying rule, on that seat own counts and not on counts taken over the seat key as a whole",
+        "check_17_verdict": "NOT PROVEN",
+        "criterion": "AC-P14",
+        "brief_fixture": "A duplicated seat key fixture, gate side form, at brief section 5.8.1"
+      }
+    }
+  }
+}

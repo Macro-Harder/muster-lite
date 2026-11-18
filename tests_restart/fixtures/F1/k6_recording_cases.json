@@ -1,0 +1,188 @@
+{
+  "cases": {
+    "file": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "recording_mismatch_row": "file",
+        "frozen_roster": {
+          "stage": "Step 13 fixture stage",
+          "roster_record_file": "fixture-frozen-roster.md",
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 512
+        },
+        "recording_record": {
+          "stage_it_was_run_for": "Step 13 fixture stage",
+          "frozen_roster_it_was_recorded_for": {
+            "roster_record_file": "fixture-other-roster.md",
+            "roster_standing": "frozen roster"
+          },
+          "content_binding": {
+            "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "byte_size": 512
+          },
+          "runner_identity_as_recorded": "fixture-precheck-runner",
+          "runner_capacity_as_recorded": "coordinator as precheck",
+          "precheck_result_as_recorded": "NOT PROVEN",
+          "recorded_result": "NOT PROVEN"
+        },
+        "matching_rule": "brief section 5.4, shape 17: a recording record matches the frozen roster if and only if its stage equals the stage judged, its RosterRecord file equals the file of the frozen RosterRecord instance the gate run compares, and its content binding equals the hash and byte size of that frozen roster file as it stands in the supplied set"
+      },
+      "expected": {
+        "field_9_value_for_row": "none recorded for this frozen roster",
+        "other_roster_recording_named_apart": true,
+        "named_apart_words": "a recorded precheck for another roster stands in the supplied set, naming its RosterRecord file and its stage as recorded, and it is not counted for this frozen roster",
+        "check_17_effect": "none"
+      }
+    },
+    "stage": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "recording_mismatch_row": "stage",
+        "frozen_roster": {
+          "stage": "Step 13 fixture stage",
+          "roster_record_file": "fixture-frozen-roster.md",
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 512
+        },
+        "recording_record": {
+          "stage_it_was_run_for": "Step 14 fixture stage",
+          "frozen_roster_it_was_recorded_for": {
+            "roster_record_file": "fixture-frozen-roster.md",
+            "roster_standing": "frozen roster"
+          },
+          "content_binding": {
+            "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "byte_size": 512
+          },
+          "runner_identity_as_recorded": "fixture-precheck-runner",
+          "runner_capacity_as_recorded": "coordinator as precheck",
+          "precheck_result_as_recorded": "NOT PROVEN",
+          "recorded_result": "NOT PROVEN"
+        },
+        "matching_rule": "brief section 5.4, shape 17: a recording record matches the frozen roster if and only if its stage equals the stage judged, its RosterRecord file equals the file of the frozen RosterRecord instance the gate run compares, and its content binding equals the hash and byte size of that frozen roster file as it stands in the supplied set"
+      },
+      "expected": {
+        "field_9_value_for_row": "none recorded for this frozen roster",
+        "other_roster_recording_named_apart": true,
+        "named_apart_words": "a recorded precheck for another roster stands in the supplied set, naming its RosterRecord file and its stage as recorded, and it is not counted for this frozen roster",
+        "check_17_effect": "none"
+      }
+    },
+    "hash": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "recording_mismatch_row": "hash",
+        "frozen_roster": {
+          "stage": "Step 13 fixture stage",
+          "roster_record_file": "fixture-frozen-roster.md",
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 512
+        },
+        "recording_record": {
+          "stage_it_was_run_for": "Step 13 fixture stage",
+          "frozen_roster_it_was_recorded_for": {
+            "roster_record_file": "fixture-frozen-roster.md",
+            "roster_standing": "frozen roster"
+          },
+          "content_binding": {
+            "hash": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "byte_size": 512
+          },
+          "runner_identity_as_recorded": "fixture-precheck-runner",
+          "runner_capacity_as_recorded": "coordinator as precheck",
+          "precheck_result_as_recorded": "NOT PROVEN",
+          "recorded_result": "NOT PROVEN"
+        },
+        "matching_rule": "brief section 5.4, shape 17: a recording record matches the frozen roster if and only if its stage equals the stage judged, its RosterRecord file equals the file of the frozen RosterRecord instance the gate run compares, and its content binding equals the hash and byte size of that frozen roster file as it stands in the supplied set"
+      },
+      "expected": {
+        "field_9_value_for_row": "none recorded for this frozen roster",
+        "other_roster_recording_named_apart": true,
+        "named_apart_words": "a recorded precheck for another roster stands in the supplied set, naming its RosterRecord file and its stage as recorded, and it is not counted for this frozen roster",
+        "check_17_effect": "none"
+      }
+    },
+    "byte size": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "recording_mismatch_row": "byte size",
+        "frozen_roster": {
+          "stage": "Step 13 fixture stage",
+          "roster_record_file": "fixture-frozen-roster.md",
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "byte_size": 512
+        },
+        "recording_record": {
+          "stage_it_was_run_for": "Step 13 fixture stage",
+          "frozen_roster_it_was_recorded_for": {
+            "roster_record_file": "fixture-frozen-roster.md",
+            "roster_standing": "frozen roster"
+          },
+          "content_binding": {
+            "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "byte_size": 513
+          },
+          "runner_identity_as_recorded": "fixture-precheck-runner",
+          "runner_capacity_as_recorded": "coordinator as precheck",
+          "precheck_result_as_recorded": "NOT PROVEN",
+          "recorded_result": "NOT PROVEN"
+        },
+        "matching_rule": "brief section 5.4, shape 17: a recording record matches the frozen roster if and only if its stage equals the stage judged, its RosterRecord file equals the file of the frozen RosterRecord instance the gate run compares, and its content binding equals the hash and byte size of that frozen roster file as it stands in the supplied set"
+      },
+      "expected": {
+        "field_9_value_for_row": "none recorded for this frozen roster",
+        "other_roster_recording_named_apart": true,
+        "named_apart_words": "a recorded precheck for another roster stands in the supplied set, naming its RosterRecord file and its stage as recorded, and it is not counted for this frozen roster",
+        "check_17_effect": "none"
+      }
+    },
+    "two_matching_conflict": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "recording": "two matching recordings, different recorded results"
+      },
+      "expected": {
+        "both_carried": true,
+        "order": "recording record file path order",
+        "conflict_named": true,
+        "check_17_effect": "none"
+      }
+    },
+    "no_recording": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "gate run",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity",
+        "recording": "no recording record"
+      },
+      "expected": {
+        "field_9_value": "none recorded",
+        "check_17_verdict_unchanged": true,
+        "open_case_state_anywhere": false
+      }
+    }
+  },
+  "brief_source": "brief section 5.8.1, the recording mismatch fixture at the matching rule at brief section 5.4, shape 17, rows one to four, file, stage, hash and byte size; brief section 5.6.2, the D12 element naming apart words"
+}

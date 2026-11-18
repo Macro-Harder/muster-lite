@@ -1,0 +1,19 @@
+{
+  "cases": {
+    "precheck": {
+      "run_input": {
+        "build": "muster-lite-fixture-build",
+        "stage": "Step 13 fixture stage",
+        "run_kind": "precheck",
+        "runner_identity": "fixture-runner",
+        "runner_capacity": "fixture-capacity"
+      },
+      "expected": {
+        "field_9": "not a gate run",
+        "check_17_listing": "check 17, listed in full",
+        "check_17_check_result": null,
+        "check_17_limb_result": null
+      }
+    }
+  }
+}
