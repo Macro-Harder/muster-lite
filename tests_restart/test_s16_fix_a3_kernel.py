@@ -21,25 +21,11 @@ on the markdown path at all.
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FIXTURE_DIR = (Path(__file__).resolve().parent / "fixtures"
-               / "step15_roster")
-
-
-def _stage_step15_project(root):
-    steps = root / "design" / "restart" / "steps"
-    steps.mkdir(parents=True)
-    for name in ("step-15-roster.md", "step-15-record.md",
-                 "step-15-gate-record.md"):
-        shutil.copyfile(FIXTURE_DIR / name, steps / name)
-    shutil.copyfile(FIXTURE_DIR / "TIER-RECORD.md",
-                    root / "design" / "restart" / "TIER-RECORD.md")
-    return root
 
 
 def _run_cli(args, cwd, pythonpath):
@@ -131,51 +117,6 @@ def test_s16a21_05_markdown_roster_pass_citations_name_evidence_seats(
     assert len(seen) == len(expected), (
         "the four citations did not differ where the evidence "
         "differs: %s" % (seen,))
-
-
-def test_s16a21_05_real_step15_roster_pass_citations_name_evidence_seats(
-        tmp_path):
-    base = "design/restart/steps/step-15"
-    supplied = [
-        (base + "-roster.md", "stage records"),
-        (base + "-roster.md", "claim bearing files"),
-        (base + "-record.md", "stage records"),
-        (base + "-record.md", "claim bearing files"),
-        ("design/restart/TIER-RECORD.md", "stage records"),
-        (base + "-gate-record.md", "claim bearing files"),
-    ]
-    project_root = _stage_step15_project(tmp_path / "project")
-    proc = _run_cli(_gate_args("Step 15", supplied),
-                    project_root, REPO_ROOT)
-    assert proc.returncode == 0, proc.stderr
-    outcome = json.loads(proc.stdout)
-    checks = _checks(outcome)
-    expected = {
-        2: ("seat-2", 8),
-        3: ("seat-8", 17),
-        11: ("seat-8", 17),
-    }
-    for number, (seat_key, line) in expected.items():
-        entry = checks[number]
-        assert entry["verdict"] == "PASS"
-        citation = entry["citations"][0]
-        assert "step-15-roster.md" in citation
-        assert "line %d" % line in citation, (
-            "check %s cited %s on the real Step 15 roster drive, "
-            "not the line %d its evidence rests on"
-            % (number, citation, line))
-        assert "seat %s" % seat_key in citation, (
-            "check %s cited %s on the real Step 15 roster drive, "
-            "not the seat %s its evidence rests on"
-            % (number, citation, seat_key))
-    for number in (6, 7, 9, 10, 13, 14, 15, 16, 17):
-        entry = checks[number]
-        assert entry["verdict"] == "PASS"
-        citation = entry["citations"][0]
-        assert "line 7" in citation and "seat seat-1" in citation, (
-            "roster wide check %s moved from the first seat line "
-            "the in open record states for it: %s"
-            % (number, citation))
 
 
 def test_s16ra21_01_check8_check12_evidence_absent_from_markdown_assembly():

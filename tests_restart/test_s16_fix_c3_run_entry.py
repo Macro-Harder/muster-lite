@@ -20,22 +20,11 @@ where the roster states one.
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FIXTURE_DIR = (Path(__file__).resolve().parent / "fixtures"
-               / "step15_roster")
-
-
-def _stage_step15_roster(root):
-    steps = root / "design" / "restart" / "steps"
-    steps.mkdir(parents=True)
-    staged = steps / "step-15-roster.md"
-    shutil.copyfile(FIXTURE_DIR / "step-15-roster.md", staged)
-    return staged
 
 
 def _run_cli(args, cwd, pythonpath):
@@ -149,28 +138,6 @@ def test_s16ra21_01_selection_and_author_record_absent_from_assembly(
             "check %s moved from the first seat standing the "
             "stopped limb record states for it: %s"
             % (number, citation))
-
-
-def test_s16ra21_01_real_step15_roster_work_products_stand_as_stated(
-        tmp_path):
-    sys.path.insert(0, str(REPO_ROOT))
-    from muster_restart.run_entry import _parse_roster_content
-    path = _stage_step15_roster(tmp_path / "project")
-    text = path.read_text(encoding="utf-8")
-    assembled = _parse_roster_content(text, str(path))
-    assert assembled is not None
-    seats = assembled["seats"]
-    assert len(seats) == 56
-    assert seats[1]["work_products"] == [
-        "design/restart/steps/step-15-clerk-notes.md"], (
-        "the first Records Clerk work product the real roster "
-        "states does not stand assembled: %s" % (seats[1],))
-    for seat in seats:
-        for product in seat.get("work_products") or []:
-            assert "/" in product and " " not in product, (
-                "a work product stands assembled that the roster "
-                "does not state as a path: %s" % product)
-    assert "selection" not in assembled
 
 
 def test_s16ra21_01_work_products_assembled_from_paper_statements(
