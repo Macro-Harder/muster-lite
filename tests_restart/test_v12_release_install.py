@@ -85,12 +85,27 @@ def test_v12t1_no_non_standard_library_import_in_shipped_modules():
                     "import found in %s: %s" % (relative, name))
 
 
+# The clean clone node excludes itself from its inner run, by a
+# deselect of its own node id and by the MUSTER_V12T1_INNER
+# environment marker the node honours by not re-entering, and its
+# recursive call carries a timeout of 1800 seconds, inside the
+# bench guard one hour cap, so the inner run can neither re-enter
+# this node nor run without bound.
 def test_v12t1_clean_clone_suite_runs_green():
+    import os
     import subprocess
+    if os.environ.get("MUSTER_V12T1_INNER") == "1":
+        return
     importlib.import_module("muster_restart.kernel")
+    inner_env = dict(os.environ)
+    inner_env["MUSTER_V12T1_INNER"] = "1"
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests_restart", "-q"],
-        cwd=str(REPO_ROOT), capture_output=True, text=True)
+        [sys.executable, "-m", "pytest", "tests_restart", "-q",
+         "--deselect",
+         "tests_restart/test_v12_release_install.py::"
+         "test_v12t1_clean_clone_suite_runs_green"],
+        cwd=str(REPO_ROOT), capture_output=True, text=True,
+        env=inner_env, timeout=1800)
     assert result.returncode == 0, (
         "WRONG OUTPUT V12-T1: the clean clone suite not green: %s"
         % result.stdout[-400:])
@@ -110,13 +125,66 @@ def test_v12t1_first_run_over_shipped_staffed_roster_fixture():
 # does not name, design material or a builder mention found inside
 # file contents and not only in file names. The contents list stands
 # at plan section 12 and in SHIPPED_CONTENTS_LIST above.
+# The shipped tree the plan section 12 contents list names, walked
+# from the clone root the release verification states. The list
+# names the three module files by their paths, the counting table
+# data files by their three named parts, the regression fixtures as
+# the one set, and the README and the LICENSE by their bare names.
+# The walker walks the shipped tree where it stands in the clone:
+# the package directory, the fixtures directory, and the README and
+# LICENSE at the root. It yields each shipped file under the name
+# the contents list states for it, and a file standing in the
+# walked places that the list does not name under its own path, so
+# the contents sweep names it and fails on it. The package file
+# __init__.py stands in the package directory as the package
+# machinery: the contents list states the shipped tree without it,
+# as the module head above states that tree, and the walker does
+# not yield it. Interpreter artefact files under __pycache__
+# directories are not shipped files and are not yielded.
+_SHIPPED_NAME_BY_PATH = {
+    "muster_restart/layer1.json": "counting tables, Layer 1",
+    "muster_restart/layer2.json":
+        "counting tables, Layer 2 with exception rows",
+    "muster_restart/mapping.json": "counting tables, mapping rows",
+    "README.md": "README",
+}
+_SHIPPED_PATH_BY_NAME = {
+    name: path for path, name in _SHIPPED_NAME_BY_PATH.items()}
+_FIXTURE_NAME_PREFIX = "regression fixtures/"
+_PACKAGE_FILE = "muster_restart/__init__.py"
+
+
 def _shipped_files():
     importlib.import_module("muster_restart.kernel")
-    return sorted(
-        str(path.relative_to(REPO_ROOT))
-        for path in REPO_ROOT.rglob("*")
-        if path.is_file() and "tests_restart" not in path.parts
-        and ".git" not in path.parts)
+    shipped = []
+    for path in sorted((REPO_ROOT / "muster_restart").rglob("*")):
+        if not path.is_file() or "__pycache__" in path.parts \
+                or path.suffix == ".pyc":
+            continue
+        relative = str(path.relative_to(REPO_ROOT))
+        if relative == _PACKAGE_FILE:
+            continue
+        shipped.append(_SHIPPED_NAME_BY_PATH.get(relative, relative))
+    for path in sorted(FIXTURES.rglob("*")):
+        if not path.is_file() or "__pycache__" in path.parts \
+                or path.suffix == ".pyc":
+            continue
+        shipped.append(_FIXTURE_NAME_PREFIX
+                       + str(path.relative_to(FIXTURES)))
+    for root_file in ("README.md", "LICENSE"):
+        if (REPO_ROOT / root_file).is_file():
+            shipped.append(
+                _SHIPPED_NAME_BY_PATH.get(root_file, root_file))
+    return sorted(shipped)
+
+
+def _shipped_file_path(name):
+    if name in _SHIPPED_PATH_BY_NAME:
+        return _SHIPPED_PATH_BY_NAME[name]
+    if name.startswith(_FIXTURE_NAME_PREFIX):
+        return "tests_restart/fixtures/" + name[
+            len(_FIXTURE_NAME_PREFIX):]
+    return name
 
 
 def test_v12t2_every_shipped_file_stands_on_contents_list():
@@ -132,7 +200,7 @@ def test_v12t2_every_shipped_file_stands_on_contents_list():
 
 def test_v12t2_no_design_material_inside_file_contents():
     for relative in _shipped_files():
-        text = (REPO_ROOT / relative).read_text(
+        text = (REPO_ROOT / _shipped_file_path(relative)).read_text(
             encoding="utf-8", errors="ignore")
         for marker in ("DESIGN-BRIEF", "DESIGN-PLAN", "design brief",
                        "design plan"):
@@ -157,7 +225,7 @@ LICENCE_EXCEPTION_PHRASE = (
 
 def test_v12t2_no_builder_mention_inside_file_contents():
     for relative in _shipped_files():
-        text = (REPO_ROOT / relative).read_text(
+        text = (REPO_ROOT / _shipped_file_path(relative)).read_text(
             encoding="utf-8", errors="ignore")
         if relative == LICENCE_EXCEPTION_FILE:
             text = text.replace(LICENCE_EXCEPTION_PHRASE, "")

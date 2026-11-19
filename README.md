@@ -37,6 +37,8 @@ The shipped tool is the package at `muster_restart/`:
   point of the unit. It receives one invocation, calls the kernel,
   hands the result to the presentation module, and returns the
   outcome.
+- `muster_restart/__init__.py`: the package file. It is placed as
+  package machinery when the tool is installed.
 - `muster_restart/layer1.json`, `muster_restart/layer2.json` and
   `muster_restart/mapping.json`: the pinned counting tables,
   shipped as inspectable data in three parts kept apart: team base
@@ -46,6 +48,48 @@ The shipped tool is the package at `muster_restart/`:
 Python 3.11 or later is required. The tool uses only the Python
 standard library, works offline, and writes nothing to the records
 it checks.
+
+## Installing it
+
+No installer program ships with the tool. Installation is the
+placement of the shipped contents, unchanged, in one directory
+the operator names, by ordinary file copying. Copy the shipped
+contents into that directory, keeping the layout as shipped, and
+run the tool from there.
+
+Python 3.11 or later is required, and it must be in place before
+the first run. The tool uses only the Python standard library, so
+nothing else needs to be installed for it to run.
+
+To uninstall the tool, delete the installed directory. The tool
+keeps no state outside that directory.
+
+## Quick start
+
+The worked example below runs the shipped product over the
+shipped staffed roster fixture of family F1. The fixture stands
+at `tests_restart/fixtures/F1/shipped_staffed_roster.json`. Run
+this snippet from the root of the installed or shipped tree, with
+the tree on the Python path:
+
+```python
+import json
+from pathlib import Path
+
+from muster_restart.kernel import compute_result
+
+fixture = json.loads(Path("tests_restart/fixtures/F1/shipped_staffed_roster.json").read_text(encoding="utf-8"))
+result = compute_result({"roster_fixture": fixture["roster"]})
+print(result["fields"]["12"])
+```
+
+Expected rollup: UNVERIFIABLE
+
+For this fixture, UNVERIFIABLE means the run could not verify the
+claim from the input given in this form, because the roster
+record a full run reads was not supplied in that form, so no
+verified staffing conclusion stands for this fixture from this
+call.
 
 ## Running it
 
@@ -137,7 +181,15 @@ Exit codes:
 No exit code stands for a verdict: a code never classifies a
 stage.
 
+## Potential problem causers
+
+- A run reads only the records named for it. Records that are not supplied are not checked, and a result says nothing about records that were not supplied.
+- A passing result means the supplied records support the claim under the pinned rules. It does not prove that any agent was actually spawned, that work was done independently, or that the records are complete.
+- The install places 66 files, while the release contents list names 65 of them. The package file `muster_restart/__init__.py` is placed as package machinery and stands outside the contents list that the release contents sweep walks.
+- Interpreter artefact files, for example under `__pycache__` directories, can appear in a tree the product has run in. They are artefacts of a run, not product files.
+- One specimen check form named in early planning was withdrawn before release, because the specimen records it needed do not exist. No check stands for that specimen form.
+- No exit code stands for a verdict. A code never classifies a stage.
+
 ## License
 
-Copyright 2026 J.P. Picard aka Macro-Harder. Licensed under the
-Apache License, Version 2.0; see the LICENSE file in this repo.
+Copyright 2026 J.P. Picard aka Macro-Harder. Licensed under the Apache License, Version 2.0; see the LICENSE file in this repo.
