@@ -9,8 +9,10 @@ field number as text, a check_results list, and the remaining
 contract content under its shape names.
 """
 
+import errno
 import hashlib
 import json
+import os
 from pathlib import Path
 
 TOOL_NAME = "muster-lite"
@@ -128,6 +130,112 @@ COUNTING_MODEL = {
                           "selected": None},
 }
 
+# The counting positions and placement kinds the counting model
+# at brief section 5.4.1 states, as one closed list. A seat
+# stating a counting position outside this list states no
+# position the model knows: it does not count toward a team
+# minimum on its own wording, in base, as exempt, or as
+# uncounted, under the S17B-05 cure.
+COUNTING_POSITIONS = (
+    "counted in base", "over base at team level",
+    "uncounted at this step", "board additional", "exempt",
+    "step unit", "unplaced")
+REMOVED_POSITIONS = ("exempt", "uncounted at this step")
+
+# The stated sense of a count figure, under the S17B-08 cure: a
+# count figure stands as an integer from zero up to the largest
+# count of seats one step or one team of this version can carry.
+# A stated integer outside that sense, a required count of -5 or
+# a unit count of 1000000000000, stands as no figure.
+FIGURE_SENSE_MAX = 1000000
+
+
+def _figure_in_sense(value):
+    return isinstance(value, int) and not isinstance(value, bool) \
+        and 0 <= value <= FIGURE_SENSE_MAX
+
+
+def _out_of_list_position(seat):
+    """The counting position a seat states outside the closed
+    list at brief section 5.4.1, or None where the seat states a
+    listed position or states no position."""
+    position = seat.get("counting_position")
+    if position is None or position in COUNTING_POSITIONS:
+        return None
+    return position
+
+
+def _counts_toward_minimum(seat):
+    """A seat counts toward a team minimum where its counting
+    position is not a removed position and is not a position
+    outside the closed list."""
+    if seat.get("counting_position") in REMOVED_POSITIONS:
+        return False
+    return _out_of_list_position(seat) is None
+
+
+def _full_identifier_in_writing(seat):
+    """The full identifier a seat states in writing, or None.
+
+    A seat stating no agent identifier, by absence or by null,
+    states no identifier. A value carried under a non full kind
+    that names the value itself as less than a full identifier,
+    placeholder, fragment or blank, states no full identifier:
+    the kind governs such a seat. In every other case the value
+    standing written in the seat is the full identifier, whatever
+    kind the seat declares, under the S17B-18 cure: the kind
+    governs only seats stating no full identifier. One form
+    stands apart under its recorded grill G6 bound and is not
+    that cure: a markdown assembled seat, whose holder value is
+    its own role label carried with the kind not recorded, states
+    no full identifier, as grill G6 states for the markdown form.
+    """
+    agent = seat.get("agent_identifier")
+    if agent is None:
+        return None
+    kind = seat.get("agent_kind", "full identifier")
+    if kind in ("placeholder", "fragment", "blank"):
+        return None
+    if kind == "not recorded" and \
+            seat.get("role_name") is not None and \
+            seat.get("role_name") == agent:
+        return None
+    return agent
+
+
+def _board_seats(run_input):
+    roster = run_input.get("roster")
+    if isinstance(roster, dict):
+        board = roster.get("board_seats")
+        if isinstance(board, list):
+            return [s for s in board if isinstance(s, dict)]
+    return []
+
+
+def _counted_seats_stating_no_holder(run_input):
+    """Counted seats stating no holder, by an absent or a null
+    agent identifier, under the S17B-02 cure."""
+    return [seat for seat in _roster_seats(run_input)
+            if _counts_toward_minimum(seat)
+            and seat.get("agent_identifier") is None]
+
+
+def _duplicate_seat_keys(run_input):
+    """Seat keys carried by two seats of one roster, team seats
+    and board seats together, in roster order, under the
+    S17B-15 cure."""
+    seen = set()
+    duplicated = []
+    for seat in list(_roster_seats(run_input)) + _board_seats(run_input):
+        key = seat.get("seat_key")
+        if key is None:
+            continue
+        if key in seen and key not in duplicated:
+            duplicated.append(key)
+        seen.add(key)
+    return duplicated
+
+
 GROUP_ORDER = [
     "stage records", "pinned rule tables",
     "audit plan or round charge", "work products", "reseat records",
@@ -231,6 +339,13 @@ def _manifest_from(run_input, tables):
                 stated.get(name), dict):
             stated_entry = stated[name]
         candidate = data_dir / (name + ".json")
+        # S17B-08 cure: where the run counts from the shipped
+        # table files and a listed part does not stand as a file,
+        # the manifest reports the part as missing and stands in
+        # no fabricated form for it: no hash and no byte size
+        # stand for a part that does not stand.
+        part_missing = not candidate.is_file() and \
+            not isinstance(run_input.get("tables"), dict)
         if candidate.is_file():
             raw = candidate.read_bytes()
         else:
@@ -238,12 +353,19 @@ def _manifest_from(run_input, tables):
             raw = json.dumps(rows, sort_keys=True).encode("utf-8")
         if stated_entry.get("hash") is not None:
             entry["hash"] = stated_entry["hash"]
+        elif part_missing:
+            entry["hash"] = NO_HASH_STANDING
         else:
             entry["hash"] = hashlib.sha256(raw).hexdigest()
         if stated_entry.get("byte_size") is not None:
             entry["byte_size"] = stated_entry["byte_size"]
+        elif part_missing:
+            entry["byte_size"] = NO_BYTE_SIZE_STANDING
         else:
             entry["byte_size"] = len(raw)
+        if part_missing and stated_entry.get("hash") is None \
+                and stated_entry.get("byte_size") is None:
+            entry["standing"] = "missing"
         entries.append(entry)
     base = run_input.get("pinned_base")
     rule_base = None
@@ -271,29 +393,49 @@ def _exception_groups(tables):
 
 
 def _differing_exception_units(run_input, tables):
-    """Units whose exception rows state differing unit counts.
+    """Units whose rows state differing unit counts, with the
+    units whose differing rows stand in the shipped or stated
+    Layer 2 rows rather than in exception rows.
 
-    Only the exception rows the run input states as exception rows
-    take part. Where any two such rows for one step and one unit
-    state differing figures, no figure stands for that unit, under
-    brief section 5.3, and no selection rule stands for such rows.
+    Where any two rows for one step and one unit state differing
+    figures, no figure stands for that unit, under brief section
+    5.3, and no selection rule stands for such rows. The rows
+    taking part are every Layer 2 row the run counts from: the
+    exception rows the run input states, which stand inside the
+    Layer 2 part, and the Layer 2 rows themselves, so two shipped
+    rows for one step and unit take the differing rows outcome
+    and never a silent last row win, under the S17B-08 cure.
+    Returns the differing units and the subset of them whose
+    differing rows are not exception rows.
     """
     raw = run_input.get("tables", {})
-    rows = raw.get("exception_rows", []) if isinstance(raw, dict) else []
+    exception_rows = raw.get("exception_rows", []) \
+        if isinstance(raw, dict) else []
+    exception_keys = {(row.get("step"), row.get("unit"))
+                      for row in exception_rows}
     by_unit = {}
-    for row in rows:
+    for row in tables["parts"]["layer2"]:
         key = (row.get("step"), row.get("unit"))
         by_unit.setdefault(key, set()).add(row.get("unit_count"))
     differing = []
+    shipped = set()
     for (step, unit), figures in by_unit.items():
         if len(figures) > 1:
             differing.append((step, unit))
-    return differing
+            if (step, unit) not in exception_keys:
+                shipped.add((step, unit))
+    return differing, shipped
 
 
 def _absence_words(step, unit):
     return (
         "no team count stands for %s, because exception rows state "
+        "differing unit counts for %s and %s" % (unit, step, unit))
+
+
+def _differing_rows_words(step, unit):
+    return (
+        "no team count stands for %s, because rows state "
         "differing unit counts for %s and %s" % (unit, step, unit))
 
 
@@ -309,8 +451,40 @@ def _effective_unit_counts(run_input, tables, differing):
         key = (row.get("step"), row.get("unit"))
         if key in differing:
             continue
-        figures[key] = row.get("unit_count")
+        figure = row.get("unit_count")
+        if isinstance(figure, int) and not _figure_in_sense(figure):
+            # S17B-08 cure: a figure outside the stated sense of
+            # a count stands as no figure for its unit.
+            continue
+        figures[key] = figure
     return figures
+
+
+def _out_of_sense_figures(run_input, tables):
+    """Count figures stated outside the stated sense of a count,
+    under the S17B-08 cure: Layer 1 base sizes at the tier applied
+    and Layer 2 unit counts at the stage judged, stated as
+    integers below zero or above the largest count one step or
+    one team of this version can carry. A figure stated in
+    another type stands as the run input states it and is not
+    this cure."""
+    found = []
+    tier = run_input.get("tier", "not stated")
+    step = run_input.get("stage_judged")
+    for row in tables["parts"]["layer1"]:
+        figure = row.get("base_size")
+        if isinstance(figure, int) and not _figure_in_sense(figure) \
+                and row.get("tier") == tier:
+            found.append({"part": "layer1",
+                          "team_form": row.get("team_form"),
+                          "figure": figure})
+    for row in tables["parts"]["layer2"]:
+        figure = row.get("unit_count")
+        if isinstance(figure, int) and not _figure_in_sense(figure) \
+                and row.get("step") == step:
+            found.append({"part": "layer2", "step": row.get("step"),
+                          "unit": row.get("unit"), "figure": figure})
+    return found
 
 
 # ------------------------------------------------------------------
@@ -339,50 +513,100 @@ def _entry_groups(entry):
     return [group] if group else []
 
 
-def _entry_absent(entry):
-    """A named file that does not exist, S16U-03 standing.
+def _entry_standing(entry):
+    """The standing of a named file, under the S17B-17 cure.
+
+    Three standings stand apart. Absent: the path does not stand,
+    on the S16U-03 grounds below. Standing in another form: the
+    path stands on disk but not as a regular file, as a
+    directory, a FIFO, a device or a symlink whose target does
+    not resolve. Standing: a regular file stands, or the entry
+    itself carries the file bytes, or the structured input states
+    the entry with no standing location of either kind.
 
     An entry states its own absence where it carries an exists or
     file_stands value of False. Where the entry carries content, a
-    hash or a byte size, file bytes stand for the named file in the
-    entry itself and the file is not absent on this ground. Where
-    no bytes stand in the entry and no file stands on disk at the
-    named path, the absence stands settled where the path is
-    absolute or its containing directory stands on disk, so the
-    run can settle that the named file does not stand there. An
-    entry naming no standing location of either kind stands as
-    the structured input states it.
+    hash or a byte size, file bytes stand for the named file in
+    the entry itself and the file is not absent on this ground.
+    Where no bytes stand in the entry and no file stands on disk
+    at the named path, the absence stands settled where the path
+    is absolute or its containing directory stands on disk, so
+    the run can settle that the named file does not stand there.
     """
     if entry.get("exists") is False or \
             entry.get("file_stands") is False:
-        return True
+        return "absent"
     if entry.get("content") is not None or \
             entry.get("hash") is not None or \
             entry.get("byte_size") is not None:
-        return False
+        return "standing"
     path = str(entry.get("path", ""))
     if not path:
-        return False
+        return "standing"
     candidate = Path(path)
     if candidate.is_file():
-        return False
+        return "standing"
+    if candidate.is_symlink() or candidate.exists():
+        return "other_form"
     if candidate.is_absolute():
-        return True
+        return "absent"
     parent = candidate.parent
     if str(parent) not in ("", ".") and parent.is_dir():
-        return True
-    return False
+        return "absent"
+    return "standing"
+
+
+def _other_form_kind(entry):
+    """The form a path stands in where it stands in another form:
+    a directory, a FIFO, a device, a symlink loop, or a symlink
+    whose target does not stand."""
+    candidate = Path(str(entry.get("path", "")))
+    if candidate.is_dir():
+        return "directory"
+    if candidate.is_fifo():
+        return "FIFO"
+    if candidate.is_block_device() or candidate.is_char_device():
+        return "device"
+    if candidate.is_symlink():
+        try:
+            os.stat(str(candidate))
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                return "symlink loop"
+        return "symlink"
+    return "another form"
+
+
+def _entry_absent(entry):
+    """A named file that does not exist, S16U-03 standing: the
+    absent standing of _entry_standing, and no other standing."""
+    return _entry_standing(entry) == "absent"
 
 
 def _missing_files(parsed):
-    """The named files that do not exist, stated in the result."""
+    """The named files that do not exist, stated in the result,
+    with the entries standing in another form stated apart in
+    the same list: an absent file stands as its path, and an
+    entry standing in another form stands as a mapping carrying
+    its path and the form it stands in, under the S17B-17 cure,
+    so no entry that stands on disk is listed as a file that
+    does not exist in plain form."""
     missing = []
     for entry in parsed["supplied_files"]:
-        if _entry_absent(entry):
-            path = str(entry.get("path", ""))
-            if path and path not in missing:
-                missing.append(path)
-    return sorted(missing)
+        standing = _entry_standing(entry)
+        if standing == "standing":
+            continue
+        path = str(entry.get("path", ""))
+        if not path:
+            continue
+        if standing == "absent":
+            item = path
+        else:
+            item = {"path": path, "standing": _other_form_kind(entry)}
+        if item not in missing:
+            missing.append(item)
+    return sorted(missing, key=lambda item: item
+                  if isinstance(item, str) else item["path"])
 
 
 def _g7_claim_kind(path):
@@ -416,6 +640,10 @@ def _entry_read(entry):
     A named file that does not exist stands read in no case.
     """
     if _entry_absent(entry):
+        return False
+    if _entry_standing(entry) == "other_form":
+        # An entry standing in another form carries no file
+        # bytes to read, under the S17B-17 cure.
         return False
     name = Path(str(entry.get("path", ""))).name
     if "spawn" in name and "export" in name:
@@ -624,6 +852,23 @@ def _table_verification(run_input):
     """
     manifest_tables = run_input.get("manifest_tables")
     if manifest_tables is None:
+        if not isinstance(run_input.get("tables"), dict):
+            # S17B-08 cure: where the run counts from the shipped
+            # table files and a listed part does not stand as a
+            # file, the standing is absent for that part, in the
+            # form the stated manifest standing gives, and
+            # counting does not proceed on a partial table set.
+            # Where every part stands, the standing states what
+            # stands: the shipped parts standing as files.
+            data_dir = Path(__file__).parent
+            parts = ["layer1", "layer2", "mapping"]
+            for name in parts:
+                if not (data_dir / (name + ".json")).is_file():
+                    return {"status": "absent", "table": name,
+                            "counting_allowed": False}
+            return {"status": "not stated",
+                    "counting_allowed": True,
+                    "shipped_parts_standing": parts}
         return {"status": "not stated", "counting_allowed": True}
     supplied = run_input.get("supplied_tables", [])
     for name in manifest_tables:
@@ -666,7 +911,13 @@ def _layer1_required(tables, tier):
     required = {}
     for row in tables["parts"]["layer1"]:
         if row.get("tier") == tier:
-            required[row.get("team_form")] = row.get("base_size")
+            figure = row.get("base_size")
+            if isinstance(figure, int) and not _figure_in_sense(figure):
+                # S17B-08 cure: a base size outside the stated
+                # sense of a count stands as no figure for its
+                # team form.
+                continue
+            required[row.get("team_form")] = figure
     return required
 
 
@@ -680,7 +931,7 @@ def _mapped_teams(tables, step):
     return mapped
 
 
-def _derivation(run_input, tables, differing):
+def _derivation(run_input, tables, differing, differing_shipped=()):
     """The item 1 derivation standings, in the derivation order
     brief section 5.5 item 1 states: the Layer 2 units for the
     named step, the mapping rows for each team form unit, and the
@@ -710,14 +961,33 @@ def _derivation(run_input, tables, differing):
             layer1_case = team_form
             break
     no_derivation = step is not None and not units and not mapped
+    out_of_sense = _out_of_sense_figures(run_input, tables)
     if tier == "Plaid":
         absence = ("no team count stands, because Plaid counts are "
                    "out of scope for this version")
         kind = "plaid"
     elif differing:
         dstep, unit = differing[0]
-        absence = _absence_words(dstep, unit)
+        if (dstep, unit) in differing_shipped:
+            absence = _differing_rows_words(dstep, unit)
+        else:
+            absence = _absence_words(dstep, unit)
         kind = "differing"
+    elif out_of_sense:
+        first = out_of_sense[0]
+        if first["part"] == "layer2":
+            absence = (
+                "no team count stands for %s, because the unit "
+                "count figure stated for %s and %s stands outside "
+                "the stated sense of a count"
+                % (first["unit"], step, first["unit"]))
+        else:
+            absence = (
+                "no team count stands for %s, because the base "
+                "size figure stated for %s at %s stands outside "
+                "the stated sense of a count"
+                % (first["team_form"], first["team_form"], tier))
+        kind = "out_of_sense"
     elif mapping_case is not None:
         absence = (
             "no team count stands for %s, because no mapping row "
@@ -742,6 +1012,7 @@ def _derivation(run_input, tables, differing):
         "kind": kind, "mapping_unit": mapping_case,
         "layer1_team": layer1_case,
         "no_derivation": no_derivation,
+        "out_of_sense": out_of_sense,
     }
 
 
@@ -789,15 +1060,20 @@ def _property_totals(counted_seats):
     }
 
 
-def _team_counts(run_input, tables, differing, counting_allowed):
+def _team_counts(run_input, tables, differing, counting_allowed,
+                 differing_shipped=()):
     if not counting_allowed:
         return [], None
     differing_units = {unit for (_step, unit) in differing}
+    differing_units |= {
+        entry["unit"] for entry in _out_of_sense_figures(
+            run_input, tables) if entry["part"] == "layer2"}
     roster = run_input.get("roster")
     seats = _roster_seats(run_input)
     tier = run_input.get("tier", "not stated")
     required_by_team = _layer1_required(tables, tier)
-    derivation = _derivation(run_input, tables, differing)
+    derivation = _derivation(run_input, tables, differing,
+                             differing_shipped)
     seen_teams = []
     for seat in seats:
         team = seat.get("team", seat.get("team_name"))
@@ -822,20 +1098,24 @@ def _team_counts(run_input, tables, differing, counting_allowed):
         duplicates = 0
         kept = []
         for seat in team_seats:
-            agent = seat.get("agent_identifier")
-            kind = seat.get("agent_kind", "full identifier")
-            if kind == "full identifier" and agent is not None:
+            agent = _full_identifier_in_writing(seat)
+            if agent is not None:
                 if agent in seen_agents:
                     duplicates += 1
                     continue
                 seen_agents.add(agent)
             kept.append(seat)
         removed = 0
+        out_of_list = []
         counted_seats = []
         for seat in kept:
             position = seat.get("counting_position")
-            if position in ("exempt", "uncounted at this step"):
+            if position in REMOVED_POSITIONS:
                 removed += 1
+            elif _out_of_list_position(seat) is not None:
+                # S17B-05 cure: a position outside the closed
+                # list counts toward no team minimum.
+                out_of_list.append(position)
             else:
                 counted_seats.append(seat)
         counted = len(counted_seats)
@@ -851,6 +1131,12 @@ def _team_counts(run_input, tables, differing, counting_allowed):
             "counted_total": counted,
             "slack": slack,
         }
+        if out_of_list:
+            # S17B-05 cure: the outcome names the out of list
+            # values it received.
+            entry["out_of_list_counting_positions"] = sorted(
+                {str(value) for value in out_of_list})
+            entry["out_of_list_removed"] = len(out_of_list)
         if any(any(field in seat for field in
                    ("pool_family", "perspective", "qualification"))
                for seat in team_seats):
@@ -873,7 +1159,7 @@ def _team_counts(run_input, tables, differing, counting_allowed):
 
 
 def _stage_count(run_input, tables, differing, team_counts,
-                 counting_allowed):
+                 counting_allowed, differing_shipped=()):
     figures = _effective_unit_counts(run_input, tables, set(differing))
     step = run_input.get("stage_judged")
     required_units = []
@@ -891,9 +1177,8 @@ def _stage_count(run_input, tables, differing, team_counts,
     holders = set()
     kept = []
     for seat in seats:
-        agent = seat.get("agent_identifier")
-        kind = seat.get("agent_kind", "full identifier")
-        if kind == "full identifier" and agent is not None:
+        agent = _full_identifier_in_writing(seat)
+        if agent is not None:
             holders.add(agent)
             if agent in seen_agents:
                 duplicates += 1
@@ -901,10 +1186,14 @@ def _stage_count(run_input, tables, differing, team_counts,
             seen_agents.add(agent)
         kept.append(seat)
     removed = sum(1 for s in kept if s.get("counting_position") in
-                  ("exempt", "uncounted at this step"))
-    counted = entries - duplicates - removed if counting_allowed else 0
+                  REMOVED_POSITIONS)
+    out_of_list = [s.get("counting_position") for s in kept
+                   if _out_of_list_position(s) is not None]
+    counted = entries - duplicates - removed - len(out_of_list) \
+        if counting_allowed else 0
     if not counting_allowed:
         entries, duplicates, removed = 0, 0, 0
+        out_of_list = []
     stage = {
         "entries_counted": entries,
         "duplicates_removed": duplicates,
@@ -914,10 +1203,34 @@ def _stage_count(run_input, tables, differing, team_counts,
         "holders_figure": len(holders),
         "holders_counting_kind": "rollup",
     }
+    if out_of_list:
+        # S17B-05 cure: the outcome names the out of list values
+        # it received, at stage level as at team level.
+        stage["out_of_list_counting_positions"] = sorted(
+            {str(value) for value in out_of_list})
+        stage["out_of_list_removed"] = len(out_of_list)
+    no_holder = _counted_seats_stating_no_holder(run_input)
+    if no_holder:
+        # S17B-02 cure: the holders standing stands unproven in
+        # words over counted seats stating no holder, rather
+        # than passing at a holders figure of 0.
+        stage["holders_standing"] = (
+            "unproven: %d counted seats state no holder, by an "
+            "absent or a null agent identifier, so the holders "
+            "figure does not prove distinct holders for the stage"
+            % len(no_holder))
+    duplicated_keys = _duplicate_seat_keys(run_input)
+    if duplicated_keys:
+        # S17B-15 cure: the duplicated seat keys stand named as
+        # a defect in the outcome.
+        stage["duplicate_seat_keys"] = duplicated_keys
     if differing:
         dstep, unit = differing[0]
         stage["required_count_units"] = required_units
-        stage["absence_words"] = _absence_words(dstep, unit)
+        if (dstep, unit) in differing_shipped:
+            stage["absence_words"] = _differing_rows_words(dstep, unit)
+        else:
+            stage["absence_words"] = _absence_words(dstep, unit)
     return stage
 
 
@@ -960,12 +1273,10 @@ def _rounds_below_required(run_input, tables):
             for seat in round_seats:
                 if seat.get("team", seat.get("team_name")) != team:
                     continue
-                if seat.get("counting_position") in (
-                        "exempt", "uncounted at this step"):
+                if not _counts_toward_minimum(seat):
                     continue
-                agent = seat.get("agent_identifier")
-                if seat.get("agent_kind", "full identifier") == \
-                        "full identifier" and agent is not None:
+                agent = _full_identifier_in_writing(seat)
+                if agent is not None:
                     if agent in seen:
                         continue
                     seen.add(agent)
@@ -1085,18 +1396,29 @@ def _bare_absence_for_check(run_input, number):
 
 def _duplicate_holdings(run_input):
     """Duplicate holding repair inputs: a full identifier holding
-    two seats in one team and round stands named at its later
-    seat, under union distinctness.
+    two seats in the stage stands named at its later seat, under
+    union distinctness.
+
+    The scan covers the seats of the stage as a whole, across
+    teams, and the board seats with the team seats, under the
+    S17B-01 and S17B-14 cures: the holding key is the holder and
+    the round, never the team, so one agent holding a seat in
+    each of two teams of one stage, or a board seat and a team
+    seat of one stage, stands named at the later seat. A holding
+    across two rounds stands apart, as holders are judged per
+    round where rounds exist. The identifier a seat states is
+    read under _full_identifier_in_writing, so a full identifier
+    stated in writing proves the holding whatever kind the seat
+    declares, under the S17B-18 cure.
     """
     holdings = []
     seen = {}
-    for seat in _roster_seats(run_input):
-        agent = seat.get("agent_identifier")
-        if seat.get("agent_kind", "full identifier") != \
-                "full identifier" or agent is None:
+    named = list(_roster_seats(run_input)) + _board_seats(run_input)
+    for seat in named:
+        agent = _full_identifier_in_writing(seat)
+        if agent is None:
             continue
-        key = (seat.get("team", seat.get("team_name")),
-               seat.get("round"), agent)
+        key = (seat.get("round"), agent)
         if key in seen:
             holdings.append({"entry_kind": "duplicate holding",
                              "seat": seat.get("seat_key")})
@@ -1190,7 +1512,7 @@ def _apply_pass_citations(run_input, entry):
 
 def _check_results(run_input, differing, reading, verification,
                    base_standing, tables=None, team_counts=None,
-                   parsed=None):
+                   parsed=None, differing_shipped=()):
     """Slice 4: core composing checks, items 1 to 15 in item order.
 
     Each CheckResult carries its composing mark, its rule, its
@@ -1212,7 +1534,8 @@ def _check_results(run_input, differing, reading, verification,
     roster = roster if isinstance(roster, dict) else {}
     seats = _roster_seats(run_input)
     unparseable = _roster_unparseable(run_input, reading)
-    derivation = _derivation(run_input, tables, differing)
+    derivation = _derivation(run_input, tables, differing,
+                             differing_shipped)
     rounds_below = _rounds_below_required(run_input, tables)
     step = run_input.get("stage_judged")
     tier = run_input.get("tier", "not stated")
@@ -1254,8 +1577,7 @@ def _check_results(run_input, differing, reading, verification,
             counted = [
                 s for s in seats
                 if s.get("team", s.get("team_name")) == team["team"]
-                and s.get("counting_position") not in
-                ("exempt", "uncounted at this step")]
+                and _counts_toward_minimum(s)]
             if counted:
                 required = team["required_count"]
                 index = min(required, len(counted)) - 1 \
@@ -1264,9 +1586,7 @@ def _check_results(run_input, differing, reading, verification,
         elif number == 2 and len(seats) > 1:
             first_agent = seats[0].get("agent_identifier")
             for seat in seats[1:]:
-                if seat.get("agent_kind", "full identifier") == \
-                        "full identifier" and \
-                        seat.get("agent_identifier") is not None and \
+                if _full_identifier_in_writing(seat) is not None and \
                         seat.get("agent_identifier") != first_agent:
                     seat_key = seat.get("seat_key")
                     break
@@ -1360,8 +1680,7 @@ def _check_results(run_input, differing, reading, verification,
                     for seat in seats:
                         if seat.get("team", seat.get(
                                 "team_name")) == target["team"] and \
-                                seat.get("counting_position") not in \
-                                ("exempt", "uncounted at this step"):
+                                _counts_toward_minimum(seat):
                             seat_key = seat.get("seat_key")
                             break
             elif number == 11:
@@ -1408,9 +1727,28 @@ def _check_results(run_input, differing, reading, verification,
             if differing:
                 dstep, unit = differing[0]
                 entry["verdict"] = "UNVERIFIABLE"
-                entry["missing_fact"] = (
-                    "a single exception row unit count figure for %s "
-                    "and %s" % (dstep, unit))
+                if (dstep, unit) in differing_shipped:
+                    entry["missing_fact"] = (
+                        "a single unit count figure for %s and %s, "
+                        "the rows stating differing figures"
+                        % (dstep, unit))
+                else:
+                    entry["missing_fact"] = (
+                        "a single exception row unit count figure "
+                        "for %s and %s" % (dstep, unit))
+            elif derivation["kind"] == "out_of_sense":
+                first = derivation["out_of_sense"][0]
+                entry["verdict"] = "UNVERIFIABLE"
+                if first["part"] == "layer2":
+                    entry["missing_fact"] = (
+                        "a unit count figure within the stated "
+                        "sense of a count for %s and %s"
+                        % (step, first["unit"]))
+                else:
+                    entry["missing_fact"] = (
+                        "a base size figure within the stated "
+                        "sense of a count for %s at %s"
+                        % (first["team_form"], tier))
             elif derivation["kind"] == "mapping":
                 unit = derivation["mapping_unit"]
                 entry["verdict"] = "UNVERIFIABLE"
@@ -1474,15 +1812,36 @@ def _check_results(run_input, differing, reading, verification,
             if _duplicate_holdings(run_input):
                 entry["verdict"] = "FAIL"
             else:
-                non_full = [s for s in seats if s.get(
-                    "agent_kind", "full identifier") != "full identifier"]
-                if non_full and seats:
+                no_holder = _counted_seats_stating_no_holder(
+                    run_input)
+                non_full = [s for s in seats
+                            if _full_identifier_in_writing(s) is None
+                            and s.get("agent_identifier") is not None]
+                if no_holder:
+                    # S17B-02 cure: counted seats stating no
+                    # holder leave the holders standing unproven
+                    # on this check rather than passing at 0.
+                    team = seats[0].get(
+                        "team", seats[0].get("team_name")) if seats \
+                        else None
+                    required = derivation["required_by_team"].get(
+                        team)
+                    if required is not None and len(seats) < required:
+                        entry["verdict"] = "FAIL"
+                    else:
+                        entry["verdict"] = "NOT PROVEN"
+                        entry["missing_fact"] = (
+                            "the holders standing for the stage, "
+                            "unproven over %d counted seats stating "
+                            "no holder, by an absent or a null "
+                            "agent identifier" % len(no_holder))
+                elif non_full and seats:
                     team = seats[0].get("team", seats[0].get("team_name"))
                     required = derivation["required_by_team"].get(team)
-                    proven = len({s.get("agent_identifier") for s in seats
-                                  if s.get("agent_kind",
-                                           "full identifier")
-                                  == "full identifier"})
+                    proven = len({_full_identifier_in_writing(s)
+                                  for s in seats
+                                  if _full_identifier_in_writing(s)
+                                  is not None})
                     if required is not None:
                         if len(seats) < required:
                             entry["verdict"] = "FAIL"
@@ -1573,19 +1932,15 @@ def _check_results(run_input, differing, reading, verification,
                             if seat.get("team", seat.get(
                                     "team_name")) != target["team"]:
                                 continue
-                            agent = seat.get("agent_identifier")
-                            kind = seat.get(
-                                "agent_kind", "full identifier")
-                            if kind == "full identifier" and \
-                                    agent is not None:
+                            agent = _full_identifier_in_writing(seat)
+                            if agent is not None:
                                 if agent in seen_agents:
                                     continue
                                 seen_agents.add(agent)
                             counted_seats.append(seat)
                         counted_seats = [
                             seat for seat in counted_seats
-                            if seat.get("counting_position") not in
-                            ("exempt", "uncounted at this step")]
+                            if _counts_toward_minimum(seat)]
                         seen_values = set()
                         for seat in counted_seats:
                             value = seat.get("perspective")
@@ -1776,6 +2131,17 @@ def _check_results(run_input, differing, reading, verification,
         elif number == 15:
             entry["composing"] = False
             entry["composes"] = False
+        if number == 1 and entry["verdict"] == "PASS":
+            # S17B-15 cure: two seats in one roster carrying one
+            # seat key stand proven on the roster the run reads,
+            # and no PASS stands over the duplication, because a
+            # citation naming the key names both seats and
+            # neither.
+            duplicated_keys = _duplicate_seat_keys(run_input)
+            if duplicated_keys:
+                entry["verdict"] = "FAIL"
+                entry["evidence"]["duplicate_seat_keys"] = \
+                    duplicated_keys
         if _roster_absent(run_input) and \
                 number in ROSTER_RESTING_CHECKS and \
                 not any(key in run_input for key in
@@ -2520,7 +2886,8 @@ def compute_result(run_input):
     parsed = _read_run_input(run_input)
     tables = _tables_from(run_input)
     manifest = _manifest_from(run_input, tables)
-    differing = _differing_exception_units(run_input, tables)
+    differing, differing_shipped = _differing_exception_units(
+        run_input, tables)
     groups = _supplied_set(parsed)
     coverage = _coverage(run_input, parsed, groups)
     receipt, ignored = _receipt_and_ignored(parsed, groups)
@@ -2529,14 +2896,16 @@ def compute_result(run_input):
     verification = _table_verification(run_input)
     counting_allowed = verification["counting_allowed"]
     team_counts, absence = _team_counts(
-        run_input, tables, differing, counting_allowed)
+        run_input, tables, differing, counting_allowed,
+        differing_shipped)
     stage_count = _stage_count(
-        run_input, tables, differing, team_counts, counting_allowed)
+        run_input, tables, differing, team_counts, counting_allowed,
+        differing_shipped)
     if absence is not None:
         stage_count["absence_words"] = absence
     check_results, check_side = _check_results(
         run_input, differing, reading, verification, base, tables,
-        team_counts, parsed)
+        team_counts, parsed, differing_shipped)
     limb_results = _limb_results(parsed, run_input)
     difference = _difference_duty(run_input, parsed)
     check_results = _place_check17(

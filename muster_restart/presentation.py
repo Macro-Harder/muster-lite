@@ -193,6 +193,64 @@ def _check_verdict(entry):
     return word if isinstance(word, str) and word else None
 
 
+_OTHER_FORM_LIST_KEYS = (
+    "other_form_files",
+    "entries_standing_in_another_form",
+    "files_standing_in_another_form",
+    "standing_in_another_form_files",
+    "other_form_entries",
+)
+_OTHER_FORM_WORDS = (
+    "symlink loop", "directory", "fifo", "device", "symlink",
+    "socket", "pipe",
+)
+
+
+def _other_form_label(entry):
+    """The form an entry stands in, where its standing states one.
+
+    A missing files entry states its own standing where the
+    kernel supplies it as a mapping: a standing, form or kind
+    value naming another form, a directory, a FIFO, a device, a
+    symlink loop or another non regular form, or a flag stating
+    the entry stands in another form or is not a regular file.
+    Where the standing names a specific form, that form stands
+    as the label; where it states only that the entry stands in
+    another form, the label is that standing in words. Where no
+    such standing stands in the entry, no label stands and the
+    entry is a file that does not exist, as before.
+    """
+    if not isinstance(entry, dict):
+        return None
+    if entry.get("is_directory") is True:
+        return "directory"
+    if entry.get("is_fifo") is True:
+        return "FIFO"
+    if entry.get("is_device") is True:
+        return "device"
+    texts = []
+    for key in ("standing", "file_standing", "entry_form", "form",
+                "entry_kind", "kind", "status"):
+        value = entry.get(key)
+        if isinstance(value, str) and value:
+            texts.append(value.lower())
+    joined = " ".join(texts)
+    for word in _OTHER_FORM_WORDS:
+        if word in joined:
+            return "FIFO" if word == "fifo" else word
+    if "another form" in joined or "not a regular" in joined \
+            or "not regular" in joined:
+        return "another form"
+    if entry.get("stands_in_another_form") is True \
+            or entry.get("standing_in_another_form") is True \
+            or entry.get("not_regular_file") is True:
+        return "another form"
+    if entry.get("exists") is True \
+            and entry.get("is_file") is False:
+        return "another form"
+    return None
+
+
 def _view(result):
     """The one record reading every form renders from.
 
@@ -464,6 +522,7 @@ def _view(result):
             absence_words = carried
 
     missing_files = []
+    other_form_files = []
     field5 = fields.get("5")
     raw_missing = field5.get("missing_files") \
         if isinstance(field5, dict) else None
@@ -477,8 +536,35 @@ def _view(result):
                 name = entry.get("path") or entry.get("name")
             else:
                 name = entry
-            if name:
+            if not name:
+                continue
+            label = _other_form_label(entry)
+            if label is None:
                 missing_files.append(str(name))
+            else:
+                other_form_files.append(
+                    {"path": str(name), "form": label})
+    for source in (field5 if isinstance(field5, dict) else {},
+                   result):
+        for key in _OTHER_FORM_LIST_KEYS:
+            carried = source.get(key)
+            if not isinstance(carried, list):
+                continue
+            for entry in carried:
+                if isinstance(entry, dict):
+                    name = entry.get("path") or entry.get("name")
+                    label = _other_form_label(entry) \
+                        or entry.get("form") \
+                        or "another form"
+                else:
+                    name = entry
+                    label = "another form"
+                if name and str(name) not in (
+                        item["path"] for item in other_form_files):
+                    other_form_files.append(
+                        {"path": str(name), "form": str(label)})
+                    if str(name) in missing_files:
+                        missing_files.remove(str(name))
 
     roster_absent = any(
         isinstance(entry.get("missing_fact"), str)
@@ -515,6 +601,7 @@ def _view(result):
         "stage_count": stage_count,
         "absence_words": absence_words,
         "missing_files": missing_files,
+        "other_form_files": other_form_files,
         "roster_absent": roster_absent,
         "table_absence": table_absence,
         "primary_count": primary,
@@ -622,6 +709,30 @@ def _missing_files_text(view):
     if not missing:
         return "none"
     return ", ".join(str(name) for name in missing)
+
+
+def _other_form_text(view):
+    other = view.get("other_form_files") or []
+    return ", ".join(
+        "%s (%s)" % (entry.get("path"), entry.get("form"))
+        for entry in other)
+
+
+def _supplied_files_text(view):
+    """The missing files statement of the supplied set line.
+
+    The files that do not exist stand under the missing files
+    heading, as before. An entry the record states as standing
+    in another form stands apart, under its own heading stating
+    that standing and the form it stands in, and never among
+    the files that do not exist. Where no such entry stands, no
+    such heading stands and the line reads as before.
+    """
+    text = "Missing files: %s." % _missing_files_text(view)
+    if view.get("other_form_files"):
+        text = "%s Entries standing in another form: %s." % (
+            text, _other_form_text(view))
+    return text
 
 
 def _check17_verdict(view):
@@ -902,10 +1013,10 @@ def _shared_contents(view):
                 missing_text, duplicate_text)
         ),
         "supplied set line with coverage statement and run receipt": (
-            "Supplied set: %s. Receipt: %s. Missing files: %s." % (
+            "Supplied set: %s. Receipt: %s. %s" % (
                 _coverage_statement(view),
                 _receipt_names_text(view),
-                _missing_files_text(view),
+                _supplied_files_text(view),
             )
         ),
         "consequence line": _consequence_line(view),
@@ -1330,6 +1441,7 @@ def _render_agentic(view):
         "receipt": view["receipt"],
         "ignored_inputs": view["ignored"],
         "missing_files": view["missing_files"],
+        "entries_standing_in_another_form": view["other_form_files"],
         "stage_count": view["stage_count"],
         "team_counts": [] if view.get("absence_words")
                        else view["counts"],
@@ -1373,6 +1485,15 @@ _TOOL_DEFECT_STATEMENT = (
     "about the stage records."
 )
 _TOOL_REPAIR_ACT = "a tool repair, not a restaffing act"
+_CALLER_DEFECT_STATEMENT = (
+    "This disagreement is caused by a caller supplied string, "
+    "%s, which carries a line break, and is not a defect in "
+    "the tool and not a finding about the stage records."
+)
+_CALLER_REPAIR_ACT = (
+    "correct the caller supplied string, %s, by stating it "
+    "without a line break, not a tool repair"
+)
 _FORM_AGREEMENT_CHECK = "form agreement check"
 _FORM_AGREEMENT_RULE = (
     "G23: every form is a reading of the one computed result"
@@ -1411,6 +1532,8 @@ _ELEMENT_CONTRACT_FIELD = {
     "claim differences": 8,
     "receipt": 5,
     "ignored inputs": 5,
+    "missing files": 5,
+    "entries standing in another form": 5,
     "field 12": 12,
     "run kind": 2,
     "open case positions": 12,
@@ -1475,10 +1598,10 @@ def _advanced_roster(view, contents):
 
 def _advanced_supplied(view):
     return (
-        "Supplied set: %s. Receipt: %s. Missing files: %s." % (
+        "Supplied set: %s. Receipt: %s. %s" % (
             _coverage_statement(view),
             _receipt_detail(view),
-            _missing_files_text(view),
+            _supplied_files_text(view),
         )
     )
 
@@ -1761,6 +1884,9 @@ def _compare_agentic_one(generated_form, view, skip):
         ("receipt", "receipt", view["receipt"]),
         ("ignored inputs", "ignored_inputs", view["ignored"]),
         ("missing files", "missing_files", view["missing_files"]),
+        ("entries standing in another form",
+         "entries_standing_in_another_form",
+         view["other_form_files"]),
         ("stage count", "stage_count", view["stage_count"]),
         ("team counts", "team_counts",
          [] if view.get("absence_words") else view["counts"]),
@@ -1775,6 +1901,8 @@ def _compare_agentic_one(generated_form, view, skip):
         if (element, "form field") in skip:
             continue
         form_value = generated_form.get(key)
+        if form_value is None and record_value == []:
+            form_value = []
         if form_value != record_value:
             return _defect_report(
                 element, "Agentic", record_value, form_value), (
@@ -1782,12 +1910,81 @@ def _compare_agentic_one(generated_form, view, skip):
     return None, None
 
 
+def _caller_cause_label(view, record_value, form_value):
+    """The caller supplied string a disagreement rests on.
+
+    The caller supplied strings stand in the record reading as
+    the stage, the runner identity, the runner capacity, the
+    tier and the pinned base. Where one of them carries a line
+    break, a form rendered from it cannot stand line by line as
+    the record reads, and the disagreements that follow in the
+    run rest on that string: a forged line in such a string
+    stands in the report values themselves, at the element that
+    carries the string, and the later disagreements in the same
+    form are its cascade. The label stands for the first such
+    string whose opening line stands in a report value, or for
+    the first such string where none does. Where no caller
+    supplied string carries a line break, no label stands and
+    the disagreement is record borne, with the fixture tool
+    defect wording untouched.
+    """
+    candidates = (
+        ("the stage", view.get("stage")),
+        ("the runner identity", view.get("runner")),
+        ("the runner capacity", view.get("capacity")),
+        ("the tier", view.get("tier")),
+        ("the pinned base", view.get("base_shown")),
+    )
+    poisoned = [
+        (label, value) for label, value in candidates
+        if isinstance(value, str)
+        and ("\n" in value or "\r" in value)]
+    if not poisoned:
+        return None
+    texts = [value for value in (record_value, form_value)
+             if isinstance(value, str)]
+    for label, value in poisoned:
+        opening = value.splitlines()[0] if value.splitlines() \
+            else value
+        if any(opening and opening in text for text in texts):
+            return label
+    return poisoned[0][0]
+
+
+def _apply_caller_cause(report, view):
+    """Restate a defect report whose cause is a caller string.
+
+    Where the disagreement rests on a caller supplied string
+    carrying a line break, the defect statement names that
+    string as the cause and the repair act follows the cause:
+    correct the caller supplied string, not a tool repair. The
+    defect field word stands as before. Where no such string
+    stands, the report stands untouched.
+    """
+    if report is None:
+        return report
+    label = _caller_cause_label(
+        view, report.get("value_in_result_record"),
+        report.get("value_in_generated_form"))
+    if label is None:
+        return report
+    report = dict(report)
+    report["tool_defect_statement"] = (
+        _CALLER_DEFECT_STATEMENT % label)
+    report["repair_act"] = _CALLER_REPAIR_ACT % label
+    return report
+
+
 def _compare_one(result_record, generated_form, view, skip):
     if isinstance(generated_form, dict):
-        return _compare_agentic_one(generated_form, view, skip)
-    if not isinstance(generated_form, str):
+        report, identity = _compare_agentic_one(
+            generated_form, view, skip)
+    elif not isinstance(generated_form, str):
         return None, None
-    return _compare_text_one(generated_form, view, skip)
+    else:
+        report, identity = _compare_text_one(
+            generated_form, view, skip)
+    return _apply_caller_cause(report, view), identity
 
 
 def form_agreement_compare(result_record, generated_form):

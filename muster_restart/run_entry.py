@@ -45,6 +45,40 @@ VALID_RUNNER_CAPACITIES = (
     "board member other than the stage coordinator",
 )
 
+# Tier values on the ladder the brief and plan state, exact
+# spellings only, S17B-12 cure.
+VALID_TIERS = ("Low", "Medium", "High", "Extra High", "Plaid")
+
+# The closed supplied file group list, in the group order the
+# kernel states for the supplied set, S17B-12 cure.
+VALID_SUPPLIED_GROUPS = (
+    "stage records", "pinned rule tables",
+    "audit plan or round charge", "work products",
+    "reseat records", "claim bearing files", "ignored inputs",
+)
+
+# The one run kind value the call shape states, S17B-11 cure: a
+# gate run states no run kind, and precheck stands for a
+# coordinator precheck only.
+VALID_RUN_KINDS = ("precheck",)
+COORDINATOR_CAPACITY = "coordinator as precheck"
+
+# The claim record keys of the structured RunInput form the
+# kernel surface states, assembled from the content of named
+# claim bearing files under the S17B-06 cure. No prose line form
+# for claim passages stands stated in the brief or the plan, so
+# no claim key is assembled from prose content.
+CLAIM_RECORD_KEYS = (
+    "claim_kind", "direction", "claim_passage",
+    "build_union_claim_figure",
+    "passage_outside_recording_fields",
+    "passage_outside_the_six_recording_fields", "form",
+    "recording_capacity_only", "claim_standing",
+    "frozen_roster", "gate_roster", "reseat_records",
+    "difference_kind", "limb", "report_text_claims",
+    "differing_seats",
+)
+
 # Outcome kind names at plan section 9, in kind order 1 to 5.
 KIND_NAMES = {
     1: "completed gate run",
@@ -661,11 +695,12 @@ def run_invocation(invocation):
         return blocked
     try:
         result_record = _kernel_module.compute_result(invocation)
-    except Exception as exc:
+    except Exception:
+        # S17B-07 cure: no internal error text stands in a cause.
         return _cannot_start(
             "tool failure", invocation,
             "a failure of the tool itself before a result record "
-            "stands: %s" % (exc,))
+            "stands")
     if result_record is None:
         return _cannot_start(
             "tool failure", invocation,
@@ -741,6 +776,7 @@ def _parse_roster_content(text, path):
             return roster
     seats = []
     team = None
+    team_heading_seen = False
     uncounted = False
     for number, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
@@ -751,6 +787,7 @@ def _parse_roster_content(text, path):
                 candidate = heading.split("(")[0].strip()
                 if candidate.lower().endswith("team"):
                     team = candidate
+                    team_heading_seen = True
             if "uncounted" in lowered or "exempt" in lowered:
                 uncounted = True
             elif line.startswith("#") or line.endswith(":"):
@@ -781,27 +818,89 @@ def _parse_roster_content(text, path):
             seat["team"] = team
         seats.append(seat)
     if not seats:
+        # S17B-16 cure: a roster record that stands and was read,
+        # stating a team heading and no seats, assembles as a
+        # stated empty roster, distinct from a roster absent, so
+        # the same fact receives the same verdict word in both
+        # syntaxes. A record stating no team heading and no seats
+        # states no roster in either stated form and stands as
+        # before.
+        if team_heading_seen:
+            return {"file": path, "seats": []}
         return None
     return {"file": path, "seats": seats}
+
+
+def _entry_groups_of(entry):
+    groups = entry.get("groups")
+    if isinstance(groups, list):
+        return [str(group) for group in groups]
+    group = entry.get("group")
+    return [str(group)] if group else []
+
+
+def _merge_roster(invocation, roster, ordinal):
+    """Merge one read roster mapping into the assembled roster.
+
+    S17B-04 cure: every supplied roster named file is read and
+    its seats assembled; no supplied roster is set aside, so the
+    verdict does not turn on entry order. Where two assembled
+    seats carry one seat key, the later seat key is stated apart
+    with its roster ordinal, so no citation names two seats.
+    """
+    standing = invocation.get("roster")
+    if not isinstance(standing, dict):
+        invocation["roster"] = roster
+        return
+    used = set()
+    for seat in standing.get("seats") or []:
+        if isinstance(seat, dict):
+            used.add(seat.get("seat_key"))
+    for seat in roster.get("seats") or []:
+        if isinstance(seat, dict) and (
+                seat.get("seat_key") in used):
+            seat = dict(seat)
+            seat["seat_key"] = "%s-r%d" % (seat.get("seat_key"),
+                                           ordinal)
+        if isinstance(seat, dict):
+            used.add(seat.get("seat_key"))
+        standing.setdefault("seats", []).append(seat)
+    board = roster.get("board_seats")
+    if isinstance(board, list):
+        standing.setdefault("board_seats", []).extend(board)
 
 
 def _assemble_content(invocation):
     """Read the named records' content into the invocation.
 
-    Only the roster mapping is assembled, from a supplied file
-    whose name names it as the roster record, and only where the
-    invocation carries no roster already. A named file that does
-    not stand on disk is left as named; its standing is the
-    kernel's receipt and coverage matter, not this section's.
+    The roster mapping is assembled from every supplied file
+    whose name names it as the roster record, each distinct path
+    read once, and only where the invocation carries no roster
+    already. The claim records are assembled from the content of
+    the named claim bearing files, in the structured RunInput
+    form the kernel surface states, under the S17B-06 cure: a
+    claim bearing file whose content is a JSON document carrying
+    claim record keys supplies those keys, first stated governing
+    where two files state one key. No claim is assembled from
+    prose content, because no line form for claim passages in
+    prose records stands stated in the brief or the plan. A named
+    file that does not stand on disk is left as named; its
+    standing is the kernel's receipt and coverage matter, not
+    this section's.
     """
     if "roster" in invocation:
         return invocation
+    seen_paths = set()
+    ordinal = 0
     for entry in invocation.get("supplied_files") or []:
         if not isinstance(entry, dict):
             continue
         path = entry.get("path")
         if not path or "roster" not in Path(str(path)).name.lower():
             continue
+        if str(path) in seen_paths:
+            continue
+        seen_paths.add(str(path))
         candidate = Path(str(path))
         if not candidate.is_file():
             continue
@@ -811,9 +910,145 @@ def _assemble_content(invocation):
             continue
         roster = _parse_roster_content(text, str(path))
         if roster is not None:
-            invocation["roster"] = roster
-            break
+            ordinal += 1
+            _merge_roster(invocation, roster, ordinal)
+    for entry in invocation.get("supplied_files") or []:
+        if not isinstance(entry, dict):
+            continue
+        if "claim bearing files" not in _entry_groups_of(entry):
+            continue
+        path = entry.get("path")
+        if not path:
+            continue
+        candidate = Path(str(path))
+        if not candidate.is_file():
+            continue
+        try:
+            text = candidate.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        stripped = text.strip()
+        if not stripped.startswith("{"):
+            continue
+        try:
+            data = json.loads(stripped)
+        except ValueError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        for key in CLAIM_RECORD_KEYS:
+            if key in data and key not in invocation:
+                invocation[key] = data[key]
     return invocation
+
+
+def _plain_type_word(value):
+    if isinstance(value, str):
+        return "a string"
+    if isinstance(value, bool):
+        return "a true or false value"
+    if isinstance(value, (int, float)):
+        return "a number"
+    if isinstance(value, list):
+        return "a list"
+    if value is None:
+        return "an empty value"
+    return "a value of another form"
+
+
+def _input_defect_outcome(invocation, args):
+    """A cannot start outcome for an input defect, or None.
+
+    S17B-07 cure, at the invocation surface: a named file that
+    stands on disk and cannot be read, seat entries stated in a
+    form that is not a seat record, and shipped table content
+    stated in a form the tables do not state, each end the call
+    at a cannot start outcome whose cause names the input and
+    the defect in plain words, carrying no internal error text
+    and no result record. The kernel level absence shape stands
+    untouched on its own surface: a named file that does not
+    stand on disk is no defect of this section.
+    """
+    for entry in invocation.get("supplied_files") or []:
+        if not isinstance(entry, dict):
+            continue
+        path = entry.get("path")
+        if not path:
+            continue
+        candidate = Path(str(path))
+        if not candidate.is_file():
+            continue
+        try:
+            candidate.read_bytes()
+        except OSError:
+            return _cannot_start(
+                "invocation", list(args),
+                "the named file %s cannot be read: the file "
+                "stands on disk but its content cannot be opened "
+                "for reading, so the invocation does not state a "
+                "readable run input" % path)
+    roster = invocation.get("roster")
+    if isinstance(roster, dict):
+        roster_name = roster.get("file") or "the roster record"
+        for field in ("seats", "board_seats"):
+            entries = roster.get(field)
+            if entries is None:
+                continue
+            if not isinstance(entries, list):
+                return _cannot_start(
+                    "invocation", list(args),
+                    "the roster record %s states its %s as %s, "
+                    "not as a list of seat records, so the "
+                    "invocation does not state a readable run "
+                    "input" % (roster_name, field,
+                               _plain_type_word(entries)))
+            for seat in entries:
+                if not isinstance(seat, dict):
+                    return _cannot_start(
+                        "invocation", list(args),
+                        "a seat entry in the roster record %s is "
+                        "stated as %s, not as a seat record, so "
+                        "the invocation does not state a readable "
+                        "run input" % (roster_name,
+                                       _plain_type_word(seat)))
+    unit_dir = Path(__file__).resolve().parent
+    for table_name, figure_field in (
+            ("layer1.json", "base_size"),
+            ("layer2.json", "unit_count"),
+            ("mapping.json", None)):
+        table_path = unit_dir / table_name
+        if not table_path.is_file():
+            continue
+        try:
+            rows = json.loads(
+                table_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError):
+            return _cannot_start(
+                "invocation", list(args),
+                "the pinned table %s cannot be read in its "
+                "stated form, so the invocation cannot start on "
+                "the tables as they stand" % table_name)
+        if not isinstance(rows, list) or any(
+                not isinstance(row, dict) for row in rows):
+            return _cannot_start(
+                "invocation", list(args),
+                "the pinned table %s states a row in a form "
+                "that is not a table row, so the invocation "
+                "cannot start on the tables as they stand"
+                % table_name)
+        if figure_field is not None:
+            for row in rows:
+                figure = row.get(figure_field)
+                if figure is not None and not isinstance(
+                        figure, int):
+                    return _cannot_start(
+                        "invocation", list(args),
+                        "the pinned table %s states a %s figure "
+                        "as %s, not as a count, so the invocation "
+                        "cannot start on the tables as they stand"
+                        % (table_name, figure_field,
+                           _plain_type_word(figure)))
+    return None
 
 
 # The option names the call shape at plan section 9 states, each
@@ -835,15 +1070,39 @@ _OPTION_FIELDS = {
 }
 
 
+# The run input fields an invocation must state, with the plain
+# field words their cannot start causes name, S17B-09 cure.
+_REQUIRED_FIELDS = (
+    ("runner_identity", "the runner identity"),
+    ("runner_capacity", "the runner capacity"),
+    ("build", "the build"),
+    ("stage_judged", "the stage"),
+    ("tier", "the tier"),
+)
+
+
 def _parse_command_line(args):
     """Parse the command line under the plan section 9 call shape.
 
     Returns the invocation, or a cannot start outcome of kind
     invocation where the line carries a name or a positional the
     contract does not state, or a stated name carrying no value:
-    no argument is silently dropped, under the S16U-06 cure.
+    no argument is silently dropped, under the S16U-06 cure. The
+    Round 1 cures stand in this parser: a repeated option name is
+    refused naming the name (S17B-10); a stated field stated as
+    an empty string is refused, never dropped (S17B-09 and
+    S17B-11); an invocation missing a run input field cannot
+    start (S17B-09); a tier outside the stated list and a
+    supplied file group outside the closed group list are each
+    refused naming the value (S17B-12); a run kind outside the
+    stated values is refused naming the value, and the precheck
+    kind stands only for the coordinator capacity (S17B-11); and
+    the coordinator capacity without the precheck kind cannot
+    start, so it produces no completed gate run carrying a
+    citable rollup (S17B-03).
     """
     invocation = {"supplied_files": []}
+    seen = set()
     index = 0
     while index < len(args):
         name = args[index]
@@ -869,15 +1128,85 @@ def _parse_command_line(args):
                 "so the invocation does not state a run input in "
                 "the RunInput form" % name)
         value = args[index + 1]
+        if name != "--supplied-file" and name in seen:
+            return None, _cannot_start(
+                "invocation", list(args),
+                "the invocation states the name %s more than "
+                "once, so no part of the invocation is silently "
+                "dropped and the invocation does not state a run "
+                "input in the RunInput form" % name)
+        seen.add(name)
+        if value == "":
+            return None, _cannot_start(
+                "invocation", list(args),
+                "the invocation states the name %s with an empty "
+                "value, so the invocation does not state a run "
+                "input in the RunInput form" % name)
         if name == "--supplied-file":
             path, _, group = value.partition(":")
-            entry = {"path": path}
-            if group:
-                entry["group"] = group
+            if not path:
+                return None, _cannot_start(
+                    "invocation", list(args),
+                    "a supplied file entry states an empty path, "
+                    "so the invocation does not state a run input "
+                    "in the RunInput form")
+            if not group:
+                return None, _cannot_start(
+                    "invocation", list(args),
+                    "a supplied file entry carries no input group, "
+                    "so the invocation does not state a run input "
+                    "in the RunInput form")
+            if group not in VALID_SUPPLIED_GROUPS:
+                return None, _cannot_start(
+                    "invocation", list(args),
+                    "a supplied file entry carries the group %s, "
+                    "which the closed group list does not state, "
+                    "so the invocation does not state a run input "
+                    "in the RunInput form" % group)
+            entry = {"path": path, "group": group}
             invocation["supplied_files"].append(entry)
         else:
             invocation[_OPTION_FIELDS[name]] = value
         index += 2
+    missing = [words for field, words in _REQUIRED_FIELDS
+               if not invocation.get(field)]
+    if missing:
+        return None, _cannot_start(
+            "invocation", list(args),
+            "the invocation does not state %s, so the invocation "
+            "does not state a run input in the RunInput form"
+            % ", ".join(missing))
+    tier = invocation.get("tier")
+    if tier not in VALID_TIERS:
+        return None, _cannot_start(
+            "invocation", list(args),
+            "the tier %s stands outside the tier values the call "
+            "shape states, so the invocation does not state a run "
+            "input in the RunInput form" % tier)
+    run_kind = invocation.get("run_kind")
+    if run_kind is not None and run_kind not in VALID_RUN_KINDS:
+        return None, _cannot_start(
+            "invocation", list(args),
+            "the run kind %s stands outside the run kind values "
+            "the call shape states, so the invocation does not "
+            "state a run input in the RunInput form" % run_kind)
+    capacity = invocation.get("runner_capacity")
+    if capacity == COORDINATOR_CAPACITY and run_kind != "precheck":
+        return None, _cannot_start(
+            "invocation", list(args),
+            "the runner capacity is the coordinator capacity, "
+            "which runs the tool only as a precheck, and the "
+            "invocation states no precheck run kind, so the "
+            "invocation does not state a run input in the "
+            "RunInput form")
+    if run_kind == "precheck" and capacity != COORDINATOR_CAPACITY:
+        return None, _cannot_start(
+            "invocation", list(args),
+            "the invocation states the precheck run kind with "
+            "the runner capacity %s, and the precheck kind "
+            "stands only for the coordinator capacity, so the "
+            "invocation does not state a run input in the "
+            "RunInput form" % capacity)
     return invocation, None
 
 
@@ -894,7 +1223,12 @@ def main(argv=None):
     if blocked is not None:
         outcome = blocked
     else:
-        outcome = run_invocation(_assemble_content(invocation))
+        assembled = _assemble_content(invocation)
+        defect = _input_defect_outcome(assembled, args)
+        if defect is not None:
+            outcome = defect
+        else:
+            outcome = run_invocation(assembled)
     record = outcome["result_record"]
     printable = {
         "kind": outcome["kind"],
