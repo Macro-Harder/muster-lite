@@ -48,10 +48,16 @@ def _slot_test(slot_number):
     slots = _load("F1/simple_template_slots.json")["slots"]
     slot = [s for s in slots if s["slot"] == slot_number][0]
     lines = forms["Simple"].splitlines()
-    assert lines[slot_number - 1] == slot["expected_line"], (
+    # The gate run Simple form carries 13 lines: slot five stands
+    # in a precheck run only and carries no gate run line, so each
+    # slot from 06 onward reads the line one index earlier than
+    # its slot number, and slots 01 to 04 read at their own index.
+    line_index = slot_number - 1 if slot_number < 5 else (
+        slot_number - 2)
+    assert lines[line_index] == slot["expected_line"], (
         "WRONG OUTPUT P7-T1: Simple form slot %d (%s) reading %r "
         "instead of the fixed template line %r"
-        % (slot_number, slot["name"], lines[slot_number - 1],
+        % (slot_number, slot["name"], lines[line_index],
            slot["expected_line"]))
 
 
@@ -139,14 +145,37 @@ def test_p7t2_element_naming_identical_across_forms():
     forms, _record = _forms()
     expected = _load("F1/shared_elements_expected.json")
     names = [e["name"] for e in expected["elements"]]
+    slots = _load("F1/simple_template_slots.json")["slots"]
+    simple_lines = forms["Simple"].splitlines()
+    agentic_names = [e["name"] for e in forms["Agentic"]["elements"]]
     for element in expected["elements"]:
-        for form_name in ("Simple", "Advanced"):
-            assert element["name"] in forms[form_name], (
-                "element %s not named in the %s form"
-                % (element["name"], form_name))
-        assert element["name"] in forms["Agentic"]["elements"], (
-            "element %s not named in the Agentic form" % element["name"])
-    assert names == [e["name"] for e in forms["Agentic"]["elements"]]
+        # The canonical names stand word for word in the Advanced
+        # form and as the Agentic element names. In the Simple form
+        # the same element stands under its fixed template line, at
+        # the slot the fixture states for it: the template lines
+        # this module pins carry the element content and no element
+        # name, so the name is reconciled with its template line.
+        assert element["name"] in forms["Advanced"], (
+            "element %s not named in the Advanced form"
+            % element["name"])
+        assert element["name"] in agentic_names, (
+            "element %s not named in the Agentic form"
+            % element["name"])
+        slot = [s for s in slots if s["slot"] == element["slot"]][0]
+        if slot["expected_line"] is None:
+            # Slot five stands in a precheck run only: the gate run
+            # Simple form carries no line for this element, and its
+            # 13 lines are the other thirteen template lines.
+            assert len(simple_lines) == 13, (
+                "element %s standing in the gate run Simple form "
+                "under a line, where its slot carries none"
+                % element["name"])
+        else:
+            assert slot["expected_line"] in simple_lines, (
+                "element %s not standing in the Simple form under "
+                "its fixed template line %r"
+                % (element["name"], slot["expected_line"]))
+    assert names == agentic_names
     assert WRONG_OUTPUT_P7_T2 not in forms["Advanced"]
 
 

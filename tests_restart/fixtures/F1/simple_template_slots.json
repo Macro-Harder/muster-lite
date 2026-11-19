@@ -50,7 +50,7 @@
     {
       "slot": 10,
       "name": "roster match line",
-      "expected_line": "Roster match: the rosters match. Differing seats by kind: 0."
+      "expected_line": "Roster match: no roster comparison standing stands in the record. Differing seats by kind: not stated."
     },
     {
       "slot": 11,
@@ -60,7 +60,7 @@
     {
       "slot": 12,
       "name": "supplied set line with coverage statement and run receipt",
-      "expected_line": "Supplied set: 2 records needed, 2 supplied, 2 read. Receipt: roster.md, step-record.md."
+      "expected_line": "Supplied set: 2 records needed, 2 supplied, 2 read. Receipt: no receipt entry stands in the record. Missing files: none."
     },
     {
       "slot": 13,

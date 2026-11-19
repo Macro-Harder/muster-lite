@@ -1,5 +1,5 @@
 {
-  "source": "Authored at Step 13 from brief section 5.7.10 (the run receipt over read and unread files). Order: the order the coverage statement names the supplied set groups, and by path within each group.",
+  "source": "Authored at Step 13 from brief section 5.7.10 (the run receipt over read and unread files). Order: the order the coverage statement names the supplied set groups, and by path within each group. Restated at Step 19: the F10-T5 pair states the files below in the result record, as its receipt and ignored inputs standings in this form, and pins the receipt forms the cured product returns over that record. The cured product carries no default receipt and no default ignored input, so no file stands in a receipt form from this fixture unless the record states it.",
   "read_files_in_receipt_order": [
     {
       "path": "roster.md",

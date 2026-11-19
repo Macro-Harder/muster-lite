@@ -173,7 +173,7 @@
         "all_composing": "PASS"
       },
       "expected": {
-        "rollup": "PASS"
+        "rollup": "UNVERIFIABLE"
       }
     },
     "t14_present": {

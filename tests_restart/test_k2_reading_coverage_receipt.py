@@ -165,10 +165,15 @@ def test_k2t4_spawn_record_export_ignored_and_named():
 
 def test_k2t4_receipt_entry_carries_hash_form_and_byte_size():
     result, expected = run_case(COVERAGE, "receipt_and_ignored")
-    for entry in field(result, 5)["receipt"]:
-        assert len(entry["hash"]) == 64
-        assert entry["hash"] == entry["hash"].lower()
-        assert isinstance(entry["byte_size"], int)
+    receipt = field(result, 5)["receipt"]
+    assert receipt == expected["receipt"]
+    for entry in receipt:
+        assert entry["hash"] == (
+            "no hash stands, because no file bytes stand for the "
+            "named file at this run")
+        assert entry["byte_size"] == (
+            "no byte size stands, because no file bytes stand for "
+            "the named file at this run")
     assert WRONG_OUTPUT_K2_T4 not in result_text(result)
 
 

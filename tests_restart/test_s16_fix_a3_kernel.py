@@ -21,12 +21,25 @@ on the markdown path at all.
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PROJECT_ROOT = REPO_ROOT.parent
+FIXTURE_DIR = (Path(__file__).resolve().parent / "fixtures"
+               / "step15_roster")
+
+
+def _stage_step15_project(root):
+    steps = root / "design" / "restart" / "steps"
+    steps.mkdir(parents=True)
+    for name in ("step-15-roster.md", "step-15-record.md",
+                 "step-15-gate-record.md"):
+        shutil.copyfile(FIXTURE_DIR / name, steps / name)
+    shutil.copyfile(FIXTURE_DIR / "TIER-RECORD.md",
+                    root / "design" / "restart" / "TIER-RECORD.md")
+    return root
 
 
 def _run_cli(args, cwd, pythonpath):
@@ -120,7 +133,8 @@ def test_s16a21_05_markdown_roster_pass_citations_name_evidence_seats(
         "differs: %s" % (seen,))
 
 
-def test_s16a21_05_real_step15_roster_pass_citations_name_evidence_seats():
+def test_s16a21_05_real_step15_roster_pass_citations_name_evidence_seats(
+        tmp_path):
     base = "design/restart/steps/step-15"
     supplied = [
         (base + "-roster.md", "stage records"),
@@ -130,8 +144,9 @@ def test_s16a21_05_real_step15_roster_pass_citations_name_evidence_seats():
         ("design/restart/TIER-RECORD.md", "stage records"),
         (base + "-gate-record.md", "claim bearing files"),
     ]
+    project_root = _stage_step15_project(tmp_path / "project")
     proc = _run_cli(_gate_args("Step 15", supplied),
-                    PROJECT_ROOT, REPO_ROOT)
+                    project_root, REPO_ROOT)
     assert proc.returncode == 0, proc.stderr
     outcome = json.loads(proc.stdout)
     checks = _checks(outcome)

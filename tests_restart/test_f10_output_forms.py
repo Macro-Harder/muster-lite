@@ -180,9 +180,23 @@ def test_f10t4_guard_figured_header_over_no_teamcount_fails():
     record = _load("F1/render_result_record.json")
     record["counts"] = None
     forms = _presentation().render_forms(record)
-    assert "smallest slack" not in forms["Advanced"], (
+    fixture = _load("F1/pass_rollup_headers.json")
+    # The guard stands on the figured header text form the fixture
+    # states, not on the bare words smallest slack: the words only
+    # header the F10-T3 case pins for this same condition carries
+    # those words in its own text, in the sentence stating that no
+    # smallest slack stands. On the one condition, no TeamCount in
+    # the result, the figured header form stands nowhere and the
+    # words only header stands in its place.
+    assert fixture["figured_header"]["text_form"] not in (
+        forms["Advanced"]), (
         "WRONG OUTPUT F10-T4: a figured header over a result with "
         "no TeamCount fails this guard")
+    assert fixture["words_only_header"]["text"] in (
+        forms["Advanced"]), (
+        "WRONG OUTPUT F10-T4: the words only header standing in "
+        "place of a figured header where no TeamCount stands "
+        "fails this guard")
 
 
 # F10-T5 wrong output form charged: fixture pair. A read file missing
@@ -191,9 +205,24 @@ def test_f10t4_guard_figured_header_over_no_teamcount_fails():
 # only, or the G-47 bound printed in other than its full form. The
 # pair stands at fixtures/F1/receipt_files.json, from brief section
 # 5.7.10.
-def test_f10t5_every_read_file_in_receipt_in_stated_order():
-    forms, _record = _forms()
+def _receipt_forms():
+    # The cured product renders the receipt the record carries and
+    # no other: it carries no default receipt and no default
+    # ignored input. The flat fixture record carries no receipt
+    # standing, so the pair states the fixture receipt standing in
+    # the record, in the form at fixtures/F1/receipt_files.json,
+    # and pins the receipt forms the product returns over it.
+    record = _load("F1/render_result_record.json")
     fixture = _load("F1/receipt_files.json")
+    record["receipt"] = [dict(entry) for entry in
+                         fixture["read_files_in_receipt_order"]]
+    record["ignored_inputs"] = [dict(entry) for entry in
+                                fixture["offered_and_unread_files"]]
+    return _presentation().render_forms(record), fixture
+
+
+def test_f10t5_every_read_file_in_receipt_in_stated_order():
+    forms, fixture = _receipt_forms()
     receipt = forms["Agentic"]["receipt"]
     paths = [entry["path"] for entry in receipt]
     expected = [entry["path"]
@@ -201,11 +230,18 @@ def test_f10t5_every_read_file_in_receipt_in_stated_order():
     assert paths == expected, (
         "WRONG OUTPUT F10-T5: a read file missing from the receipt "
         "or out of its stated order: %s" % paths)
+    for entry, stated in zip(
+            receipt, fixture["read_files_in_receipt_order"]):
+        assert entry["hash_form"] == stated["hash_form"], (
+            "WRONG OUTPUT F10-T5: a receipt entry carrying a hash "
+            "form other than the form the fixture states for it")
+        assert entry["byte_size"] == stated["byte_size"], (
+            "WRONG OUTPUT F10-T5: a receipt entry carrying a byte "
+            "size other than the size the fixture states for it")
 
 
 def test_f10t5_unread_file_in_ignored_inputs_list_only():
-    forms, _record = _forms()
-    fixture = _load("F1/receipt_files.json")
+    forms, fixture = _receipt_forms()
     unread = fixture["offered_and_unread_files"][0]["path"]
     receipt_paths = [entry["path"]
                      for entry in forms["Agentic"]["receipt"]]
@@ -213,6 +249,12 @@ def test_f10t5_unread_file_in_ignored_inputs_list_only():
         "WRONG OUTPUT F10-T5: an offered and unread file standing "
         "in the receipt instead of the ignored inputs list only")
     assert unread in forms["Agentic"]["ignored_inputs"]
+    assert forms["Agentic"]["ignored_inputs"] == [
+        entry["path"] for entry in fixture["offered_and_unread_files"]
+    ], (
+        "WRONG OUTPUT F10-T5: an ignored inputs list carrying a "
+        "file other than the offered and unread files the fixture "
+        "states, or missing one of them")
 
 
 def test_f10t5_g47_bound_printed_in_its_full_form():

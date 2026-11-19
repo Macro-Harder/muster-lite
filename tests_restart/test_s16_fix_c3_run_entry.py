@@ -20,12 +20,22 @@ where the roster states one.
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PROJECT_ROOT = REPO_ROOT.parent
+FIXTURE_DIR = (Path(__file__).resolve().parent / "fixtures"
+               / "step15_roster")
+
+
+def _stage_step15_roster(root):
+    steps = root / "design" / "restart" / "steps"
+    steps.mkdir(parents=True)
+    staged = steps / "step-15-roster.md"
+    shutil.copyfile(FIXTURE_DIR / "step-15-roster.md", staged)
+    return staged
 
 
 def _run_cli(args, cwd, pythonpath):
@@ -141,10 +151,11 @@ def test_s16ra21_01_selection_and_author_record_absent_from_assembly(
             % (number, citation))
 
 
-def test_s16ra21_01_real_step15_roster_work_products_stand_as_stated():
+def test_s16ra21_01_real_step15_roster_work_products_stand_as_stated(
+        tmp_path):
     sys.path.insert(0, str(REPO_ROOT))
     from muster_restart.run_entry import _parse_roster_content
-    path = PROJECT_ROOT / "design/restart/steps/step-15-roster.md"
+    path = _stage_step15_roster(tmp_path / "project")
     text = path.read_text(encoding="utf-8")
     assembled = _parse_roster_content(text, str(path))
     assert assembled is not None

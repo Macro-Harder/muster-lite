@@ -1,8 +1,9 @@
 {
-  "source": "Authored at Step 13 from brief section 5.7.1: the shared element set rendered in all three forms over the record at fixtures/F1/render_result_record.json.",
+  "source": "Authored at Step 13 from brief section 5.7.1: the shared element set rendered in all three forms over the record at fixtures/F1/render_result_record.json. Each element carries its slot: the slot of the fixed Simple template at fixtures/F1/simple_template_slots.json whose line carries that element in the Simple form, where the element stands under its template line and not under its canonical name. The canonical names stand word for word in the Advanced form and as the Agentic element names.",
   "elements": [
     {
       "name": "title",
+      "slot": 1,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -17,6 +18,7 @@
     },
     {
       "name": "standing grade sentence",
+      "slot": 2,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -31,6 +33,7 @@
     },
     {
       "name": "stage, tier and pinned base line",
+      "slot": 3,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -45,6 +48,7 @@
     },
     {
       "name": "rollup line",
+      "slot": 4,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -59,6 +63,7 @@
     },
     {
       "name": "precheck not yet run section",
+      "slot": 5,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -73,6 +78,7 @@
     },
     {
       "name": "build union state line",
+      "slot": 6,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -87,6 +93,7 @@
     },
     {
       "name": "counts lines",
+      "slot": 7,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -101,6 +108,7 @@
     },
     {
       "name": "runner identity and capacity line",
+      "slot": 8,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -115,6 +123,7 @@
     },
     {
       "name": "standing limits lines",
+      "slot": 9,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -129,6 +138,7 @@
     },
     {
       "name": "roster match element",
+      "slot": 10,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -143,6 +153,7 @@
     },
     {
       "name": "repair list content",
+      "slot": 11,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -157,6 +168,7 @@
     },
     {
       "name": "supplied set line with coverage statement and run receipt",
+      "slot": 12,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -171,6 +183,7 @@
     },
     {
       "name": "consequence line",
+      "slot": 13,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,
@@ -185,6 +198,7 @@
     },
     {
       "name": "closing line",
+      "slot": 14,
       "verdict": "PASS",
       "rollup": "PASS",
       "counted_total": 4,

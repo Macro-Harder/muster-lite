@@ -162,11 +162,15 @@ def test_p8t3_kernel_module_takes_no_part_in_comparison():
 # plan section 9, each kind returned in a form belonging to another
 # kind. The kinds stand at fixtures/cannot_start/outcome_kinds.json
 # and the cannot start fixtures at
-# fixtures/cannot_start/cannot_start_cases.json.
+# fixtures/cannot_start/cannot_start_cases.json. Kind selection
+# stands apart from the invocation contract in the form the product
+# states it, at run_entry.harness_kind_invocation: the run entry
+# itself reads no kind selection key.
 def _kind_outcome(kind_number):
     kinds = _load("cannot_start/outcome_kinds.json")["kinds"]
     kind = [k for k in kinds if k["kind"] == kind_number][0]
-    outcome = _run_entry().run_invocation({"outcome_kind": kind_number})
+    outcome = _run_entry().harness_kind_invocation(
+        {"outcome_kind": kind_number})
     return outcome, kind
 
 

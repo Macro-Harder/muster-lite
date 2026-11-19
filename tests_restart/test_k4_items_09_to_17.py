@@ -178,7 +178,7 @@ def test_k4t14_item14_stands_beside_the_rollup_and_never_composes():
 def test_k4t14_pass_rollup_stands_where_item14_not_proven_is_only_non_pass_word():
     result, expected = run_case(CASES, "t14_pass_rollup_stands")
     assert field(result, 12) == expected["rollup"], (
-        "WRONG OUTPUT K4-T14: a PASS rollup barred where item 14 NOT PROVEN is the only non PASS word, fixture pair at brief s5.5 item 14"
+        "WRONG OUTPUT K4-T14: a PASS rollup standing where the cured checks compose no PASS rollup, check 4 UNVERIFIABLE on the absent roster beside item 14 NOT PROVEN, fixture pair at brief s5.5 item 14"
     )
 
 

@@ -3,6 +3,7 @@
   "figured_header": {
     "stands_where": "the rollup is PASS and a slack figure stands for at least one TeamCount in the result",
     "names": "the smallest slack value in the stage and each team at that value",
+    "text_form": "PASS rollup header: smallest slack 1 (Audit team)",
     "slack_figures_in_the_same_report": {
       "Audit team": 1
     }
