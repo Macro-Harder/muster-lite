@@ -339,11 +339,84 @@ def _entry_groups(entry):
     return [group] if group else []
 
 
+def _entry_absent(entry):
+    """A named file that does not exist, S16U-03 standing.
+
+    An entry states its own absence where it carries an exists or
+    file_stands value of False. Where the entry carries content, a
+    hash or a byte size, file bytes stand for the named file in the
+    entry itself and the file is not absent on this ground. Where
+    no bytes stand in the entry and no file stands on disk at the
+    named path, the absence stands settled where the path is
+    absolute or its containing directory stands on disk, so the
+    run can settle that the named file does not stand there. An
+    entry naming no standing location of either kind stands as
+    the structured input states it.
+    """
+    if entry.get("exists") is False or \
+            entry.get("file_stands") is False:
+        return True
+    if entry.get("content") is not None or \
+            entry.get("hash") is not None or \
+            entry.get("byte_size") is not None:
+        return False
+    path = str(entry.get("path", ""))
+    if not path:
+        return False
+    candidate = Path(path)
+    if candidate.is_file():
+        return False
+    if candidate.is_absolute():
+        return True
+    parent = candidate.parent
+    if str(parent) not in ("", ".") and parent.is_dir():
+        return True
+    return False
+
+
+def _missing_files(parsed):
+    """The named files that do not exist, stated in the result."""
+    missing = []
+    for entry in parsed["supplied_files"]:
+        if _entry_absent(entry):
+            path = str(entry.get("path", ""))
+            if path and path not in missing:
+                missing.append(path)
+    return sorted(missing)
+
+
+def _g7_claim_kind(path):
+    """The grill G7 closed list kind a file name states, or None.
+
+    The closed list at G7: the step record, the gate record, the
+    roster record, the evidence register, the precheck result
+    record, and the stage own registers. A file whose name states
+    no kind on that list stands on no part of it.
+    """
+    name = Path(str(path)).name.lower()
+    if "roster" in name:
+        return "roster record"
+    if "gate" in name and "record" in name:
+        return "gate record"
+    if "evidence" in name and "register" in name:
+        return "evidence register"
+    if "precheck" in name and "record" in name:
+        return "precheck result record"
+    if "register" in name:
+        return "stage own registers"
+    if "step" in name and "record" in name:
+        return "step record"
+    return None
+
+
 def _entry_read(entry):
     """A supplied file stands read unless its entry states it is not.
 
     A spawn record export stands ignored under G5 in every case.
+    A named file that does not exist stands read in no case.
     """
+    if _entry_absent(entry):
+        return False
     name = Path(str(entry.get("path", ""))).name
     if "spawn" in name and "export" in name:
         return False
@@ -380,11 +453,16 @@ def _coverage(run_input, parsed, groups):
             path = entry.get("path")
             if path not in paths:
                 paths.append(path)
+        supplied_paths = []
+        for entry in entries:
+            if not _entry_absent(entry) and \
+                    entry.get("path") not in supplied_paths:
+                supplied_paths.append(entry.get("path"))
         read_paths = []
         for entry in entries:
             if _entry_read(entry) and entry.get("path") not in read_paths:
                 read_paths.append(entry.get("path"))
-        return {"needed": needed, "supplied": len(paths),
+        return {"needed": needed, "supplied": len(supplied_paths),
                 "read": len(read_paths)}
 
     named = run_input.get("records_named_for_round")
@@ -420,7 +498,10 @@ def _receipt_and_ignored(parsed, groups):
     by file path in byte order inside a group. No entry stands for a
     file offered and not read; such a file, and a supplied spawn
     record export under G5, stands in the ignored inputs list only,
-    named there as the report says so.
+    named there as the report says so. No entry stands for a named
+    file that does not exist, and no standing words stand in the
+    receipt for such a file; its absence is stated at contract
+    field 5 in the missing files list.
     """
     receipt = []
     seen = set()
@@ -430,6 +511,8 @@ def _receipt_and_ignored(parsed, groups):
         entries = sorted(groups[group], key=lambda e: str(e.get("path")))
         for entry in entries:
             path = str(entry.get("path"))
+            if _entry_absent(entry):
+                continue
             if not _entry_read(entry) or path in seen:
                 continue
             seen.add(path)
@@ -464,6 +547,8 @@ def _receipt_and_ignored(parsed, groups):
             })
     ignored = []
     for entry in parsed["supplied_files"]:
+        if _entry_absent(entry):
+            continue
         if not _entry_read(entry):
             name = Path(str(entry.get("path", ""))).name
             if name and name not in ignored:
@@ -624,6 +709,7 @@ def _derivation(run_input, tables, differing):
         if team_form not in required:
             layer1_case = team_form
             break
+    no_derivation = step is not None and not units and not mapped
     if tier == "Plaid":
         absence = ("no team count stands, because Plaid counts are "
                    "out of scope for this version")
@@ -641,6 +727,12 @@ def _derivation(run_input, tables, differing):
         absence = ("no team count stands, because no Layer 1 rows "
                    "stand selected")
         kind = "whole_stage"
+    elif no_derivation:
+        absence = (
+            "no team count stands for %s, because no Layer 2 row "
+            "stands for %s and no mapping row stands for %s"
+            % (step, step, step))
+        kind = "no_derivation"
     else:
         absence = None
         kind = "none"
@@ -649,6 +741,7 @@ def _derivation(run_input, tables, differing):
         "units": units, "mapped": mapped, "absence_words": absence,
         "kind": kind, "mapping_unit": mapping_case,
         "layer1_team": layer1_case,
+        "no_derivation": no_derivation,
     }
 
 
@@ -764,6 +857,18 @@ def _team_counts(run_input, tables, differing, counting_allowed):
             entry["property_conditioned_totals"] = _property_totals(
                 counted_seats)
         teams.append(entry)
+    if derivation["kind"] in ("no_derivation", "plaid"):
+        # S16A21-06 standing: where the derivation for the stage
+        # does not fire, the absence words at field 7 state that
+        # no team count stands for the stage. A team entry built
+        # from the Layer 1 tier row alone, counting no seat of
+        # the roster, is not a team count of the stage and does
+        # not stand beside those words in the same field. An
+        # entry counting seats the roster itself assigns to the
+        # team stands on those seats, as the pinned counting
+        # fixtures for property totals govern.
+        teams = [team for team in teams
+                 if team["entries_counted"] > 0]
     return teams, derivation["absence_words"]
 
 
@@ -914,6 +1019,70 @@ def _absence_outcomes(run_input):
     return outcomes
 
 
+ROSTER_RESTING_CHECKS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 11}
+ROSTER_ABSENT_MISSING_FACT = "the absent roster record for the stage"
+# A roster resting check whose own evidence stands in the run
+# input in structured form, apart from the roster key, is not at
+# bare absence for that check: check 6 rests on the step record
+# identity where one stands stated, and check 9 rests on the
+# distribution statement where one stands stated.
+_ROSTER_EVIDENCE_KEYS = {
+    6: ("step_record_identity",),
+    9: ("distribution_form",),
+}
+
+
+def _roster_absent(run_input):
+    """No roster record stands for the stage, branch 1 standing.
+
+    The branch stands where the run input states branch 1, and
+    where no roster record stands in the run input at all: the
+    roster key absent, not a mapping, or an empty mapping stating
+    no record. A roster mapping stating seats, board seats or a
+    file stands as a roster record standing.
+    """
+    if run_input.get("absence_branch") == 1:
+        return True
+    roster = run_input.get("roster")
+    return not isinstance(roster, dict) or len(roster) == 0
+
+
+# The evidence keys of checks 10 and 12 to 16, S16A21-04 kernel
+# limb: on a bare absence (no roster record stands, the supplied
+# set is empty, and no evidence of the check itself stands in the
+# run input) a PASS default of one of these checks is a PASS the
+# evidence does not earn. Where evidence of the check stands in
+# the run input, the run is not at bare absence for that check and
+# its own branch words govern.
+_BARE_ABSENCE_EVIDENCE_KEYS = {
+    10: ("reduced_tier_claim", "invocation_records"),
+    12: ("author_record", "resting_record"),
+    13: ("table_conflict", "manifest_tables", "supplied_tables",
+         "table_hashes_match_manifest"),
+    14: ("colour_result",),
+    15: ("tier_applied", "tier_claimed", "plaid_claim_stands"),
+    16: ("claim_kind", "direction", "claim_passage",
+         "passage_outside_recording_fields",
+         "build_union_claim_figure", "recording_capacity_only",
+         "report_text_claims"),
+}
+COLOUR_ABSENCE_MISSING_FACT = (
+    "the audit plan or a qualifying round charge for the stage")
+
+
+def _bare_absence_for_check(run_input, number):
+    keys = _BARE_ABSENCE_EVIDENCE_KEYS.get(number)
+    if keys is None:
+        return False
+    if not _roster_absent(run_input):
+        return False
+    if run_input.get("supplied_files"):
+        return False
+    if "composing_check_words" in run_input:
+        return False
+    return not any(key in run_input for key in keys)
+
+
 def _duplicate_holdings(run_input):
     """Duplicate holding repair inputs: a full identifier holding
     two seats in one team and round stands named at its later
@@ -943,32 +1112,43 @@ LINKAGE_NOT_APPLICABLE = (
 def _roster_location(run_input, seat_key=None):
     """The roster line location a PASS rests on, shape 8.
 
-    A seat that carries its own roster line location supplies it.
-    Otherwise the location names the roster record file, where the
-    run input states one, and the seat the evidence rests on, so
-    the location states a place a reader can follow and never
-    only the kind of record.
+    A seat that carries its own roster line location supplies it,
+    and the citation names that location and the seat the verdict
+    rests on, so the citation states the file, the line and the
+    seat. Otherwise the location names the roster record file,
+    where the run input states one, and the seat the evidence
+    rests on. Where no seat stands in the run input at all, no
+    location stands: the roster record, seat not stated fallback
+    stands nowhere on a PASS, S16U-07 standing.
     """
     roster = run_input.get("roster")
     roster = roster if isinstance(roster, dict) else {}
     file_name = roster.get("file") or roster.get("path") \
         or "roster record"
     seats = _roster_seats(run_input)
+    board = roster.get("board_seats")
+    named = list(seats) + (
+        [s for s in board if isinstance(s, dict)]
+        if isinstance(board, list) else [])
     seat = None
-    for candidate in seats:
+    for candidate in named:
         if seat_key is not None and \
                 candidate.get("seat_key") == seat_key:
             seat = candidate
             break
     if seat is None and seats:
         seat = seats[0]
-    if seat is not None and seat.get("roster_line_location"):
-        return str(seat["roster_line_location"])
-    key = seat_key
-    if key is None and seat is not None:
-        key = seat.get("seat_key")
-    return "%s, seat %s" % (file_name, key if key is not None
-                            else "not stated")
+    if seat is None:
+        return None
+    key = seat_key if seat_key is not None else seat.get("seat_key")
+    if seat.get("roster_line_location"):
+        location = str(seat["roster_line_location"])
+        if key is not None and ("seat %s" % key) not in location:
+            return "%s, seat %s" % (location, key)
+        return location
+    if key is None:
+        return None
+    return "%s, seat %s" % (file_name, key)
 
 
 def _apply_pass_citations(run_input, entry):
@@ -987,8 +1167,6 @@ def _apply_pass_citations(run_input, entry):
     if not isinstance(evidence, dict):
         evidence = {}
         entry["evidence"] = evidence
-    seat_key = evidence.get("seat")
-    location = _roster_location(run_input, seat_key)
     roster = run_input.get("roster")
     roster = roster if isinstance(roster, dict) else {}
     evidence.setdefault("file", roster.get("file")
@@ -996,11 +1174,16 @@ def _apply_pass_citations(run_input, entry):
     if "seat" not in evidence:
         seats = _roster_seats(run_input)
         evidence["seat"] = seats[0].get("seat_key") if seats else None
+    seat_key = evidence.get("seat")
+    location = _roster_location(run_input, seat_key)
     evidence.setdefault("location", location)
     second = entry.get("author_record_line_location") \
         or LINKAGE_NOT_APPLICABLE
     entry["roster_line_location"] = location
-    entry["citations"] = [location, second]
+    if location is None:
+        entry["citations"] = [second]
+    else:
+        entry["citations"] = [location, second]
     entry["missing_fact"] = None
     return entry
 
@@ -1052,7 +1235,149 @@ def _check_results(run_input, differing, reading, verification,
             "citations": [],
         }
 
+    def resting_seat(entry):
+        """The seat the check evidence rests on, S16A21-05.
+
+        Each check whose evidence names one seat records that
+        seat in its evidence, so the PASS citation names the
+        file, line and seat of that check, not the first seat
+        of the roster for every check. A check whose evidence
+        already names its seat keeps it.
+        """
+        evidence = entry.setdefault("evidence", {})
+        if not isinstance(evidence, dict) or "seat" in evidence:
+            return
+        number = entry["check"]
+        seat_key = None
+        if number == 1 and team_counts:
+            team = team_counts[0]
+            counted = [
+                s for s in seats
+                if s.get("team", s.get("team_name")) == team["team"]
+                and s.get("counting_position") not in
+                ("exempt", "uncounted at this step")]
+            if counted:
+                required = team["required_count"]
+                index = min(required, len(counted)) - 1 \
+                    if required else 0
+                seat_key = counted[index].get("seat_key")
+        elif number == 2 and len(seats) > 1:
+            first_agent = seats[0].get("agent_identifier")
+            for seat in seats[1:]:
+                if seat.get("agent_kind", "full identifier") == \
+                        "full identifier" and \
+                        seat.get("agent_identifier") is not None and \
+                        seat.get("agent_identifier") != first_agent:
+                    seat_key = seat.get("seat_key")
+                    break
+        elif number == 3:
+            for seat in seats:
+                if seat.get("carried_seat_kind") not in (None, "none"):
+                    seat_key = seat.get("seat_key")
+                    break
+        elif number == 4:
+            board = roster.get("board_seats") or []
+            if board:
+                if board[0].get("roster_line_location"):
+                    seat_key = board[0].get("seat_key")
+                else:
+                    holder = board[0].get("agent_identifier")
+                    for seat in seats:
+                        if seat.get("agent_identifier") == holder:
+                            seat_key = seat.get("seat_key")
+                            break
+        elif number == 5:
+            target = None
+            for team_count in team_counts:
+                if "property_conditioned_totals" in team_count:
+                    target = team_count
+                    break
+            if target is None and team_counts:
+                target = team_counts[0]
+            if target is not None:
+                for seat in seats:
+                    if seat.get("team", seat.get("team_name")) == \
+                            target["team"]:
+                        seat_key = seat.get("seat_key")
+                        break
+        elif number == 8:
+            selection = roster.get("selection")
+            if isinstance(selection, dict):
+                holders = selection.get("holders", [])
+                if holders:
+                    seat_key = holders[0].get("seat_key")
+        elif number == 11:
+            for seat in seats:
+                if isinstance(seat.get("exempt_claim"), dict):
+                    seat_key = seat.get("seat_key")
+                    break
+        elif number == 12:
+            author = run_input.get("author_record")
+            if isinstance(author, dict):
+                seat_key = author.get("seat_key") or author.get("seat")
+        if seats and seats[0].get("role_name") is not None and \
+                number in (2, 3, 5, 11):
+            # Markdown roster limb, the S16A21-05 residual. A
+            # roster assembled from markdown seat lines states
+            # no full identifier, no carried seat kind key and
+            # no exempt claim key: it states each seat by its
+            # role name, under its team heading, with its
+            # counting position. Where the roster stands in
+            # that form, the seat each of these checks rests on
+            # stands stated in those fields, and it is recorded
+            # here so the citation the assembly carries names
+            # it, as the structured path above already does.
+            # Checks 8 and 12 record no seat under this limb:
+            # no selection record and no author record stands
+            # in a markdown assembled roster at all, as the
+            # Fix A3 paper records in the open.
+            def role_text(seat):
+                return str(seat.get("role_name") or "").lower(
+                    ).replace("-", " ")
+            if number == 2:
+                first_agent = seats[0].get("agent_identifier")
+                for seat in seats[1:]:
+                    if seat.get("agent_identifier") is not None and \
+                            seat.get("agent_identifier") != first_agent:
+                        seat_key = seat.get("seat_key")
+                        break
+            elif number == 3:
+                for seat in seats:
+                    text = role_text(seat)
+                    if "contrarian" in text or \
+                            "fold in tracer" in text:
+                        seat_key = seat.get("seat_key")
+                        break
+            elif number == 5:
+                target = None
+                for team_count in team_counts:
+                    if team_count.get("required_count") is not None:
+                        target = team_count
+                        break
+                if target is None and team_counts:
+                    target = team_counts[0]
+                if target is not None:
+                    for seat in seats:
+                        if seat.get("team", seat.get(
+                                "team_name")) == target["team"] and \
+                                seat.get("counting_position") not in \
+                                ("exempt", "uncounted at this step"):
+                            seat_key = seat.get("seat_key")
+                            break
+            elif number == 11:
+                for seat in seats:
+                    text = role_text(seat)
+                    if seat.get("counting_position") in \
+                            ("exempt", "uncounted at this step") or \
+                            "uncounted" in text or "exempt" in text:
+                        seat_key = seat.get("seat_key")
+                        break
+        if seat_key is not None:
+            evidence["seat"] = seat_key
+
     def finish(entry):
+        if entry.get("verdict") == "PASS":
+            resting_seat(entry)
         return _apply_pass_citations(run_input, entry)
 
     results = []
@@ -1077,7 +1402,6 @@ def _check_results(run_input, differing, reading, verification,
                 "a verified counting table standing for the run")
             results.append(entry)
             continue
-
         if number == 1:
             if rounds_below:
                 entry["evidence"]["rounds_below_required"] = rounds_below
@@ -1098,6 +1422,11 @@ def _check_results(run_input, differing, reading, verification,
                 entry["missing_fact"] = (
                     "the Layer 1 row for %s at %s"
                     % (derivation["layer1_team"], tier))
+            elif derivation.get("no_derivation"):
+                entry["verdict"] = "UNVERIFIABLE"
+                entry["missing_fact"] = (
+                    "the Layer 2 row for %s and the mapping row "
+                    "for %s" % (step, step))
             elif unparseable:
                 entry["verdict"] = "NOT PROVEN"
                 if derivation["units"]:
@@ -1447,6 +1776,40 @@ def _check_results(run_input, differing, reading, verification,
         elif number == 15:
             entry["composing"] = False
             entry["composes"] = False
+        if _roster_absent(run_input) and \
+                number in ROSTER_RESTING_CHECKS and \
+                not any(key in run_input for key in
+                        _ROSTER_EVIDENCE_KEYS.get(number, ())):
+            # Branch 1 of brief section 5.5.1, S16U-02 standing:
+            # a roster resting check stands at no PASS default on
+            # bare absence, and check 4, whose board absence word
+            # on a standing roster is NOT PROVEN, takes
+            # UNVERIFIABLE where no roster record stands at all.
+            # A non PASS word a check reaches on a ground stated
+            # in the run input stands untouched.
+            if entry["verdict"] == "PASS" or (
+                    number == 4 and entry["verdict"] == "NOT PROVEN"):
+                entry["verdict"] = "UNVERIFIABLE"
+                entry["missing_fact"] = ROSTER_ABSENT_MISSING_FACT
+                entry["citations"] = []
+        if entry["verdict"] == "PASS" and \
+                _bare_absence_for_check(run_input, number):
+            # S16A21-04 kernel limb: checks 10 and 12 to 16 stand
+            # outside the Round 1 absence cure. On a bare absence
+            # their PASS defaults rest on no evidence in the run,
+            # under the per check split at brief section 5.6: the
+            # record that would settle the check is absent from
+            # the supplied set. Check 14 takes NOT PROVEN instead,
+            # the word the brief pins for colour completeness
+            # where no audit plan and no qualifying round charge
+            # is named, a pinned word the split does not reassign.
+            if number == 14:
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = COLOUR_ABSENCE_MISSING_FACT
+            else:
+                entry["verdict"] = "UNVERIFIABLE"
+                entry["missing_fact"] = ROSTER_ABSENT_MISSING_FACT
+            entry["citations"] = []
         results.append(finish(entry))
     return results, side
 
@@ -2186,6 +2549,14 @@ def compute_result(run_input):
                 entry["verdict"] = "UNVERIFIABLE"
                 entry["missing_fact"] = NO_BASE_MISSING_IDENTIFICATION
                 entry["citations"] = []
+            elif _roster_absent(run_input) and \
+                    entry["verdict"] == "PASS" and \
+                    not any(key in run_input for key in (
+                        "frozen_roster", "gate_roster", "tying",
+                        "limb", "difference_kind")):
+                entry["verdict"] = "UNVERIFIABLE"
+                entry["missing_fact"] = ROSTER_ABSENT_MISSING_FACT
+                entry["citations"] = []
             elif not counting_allowed:
                 entry["verdict"] = "NOT PROVEN"
                 entry["missing_fact"] = (
@@ -2279,8 +2650,12 @@ def compute_result(run_input):
         bounds.append(OPEN_CASE_STATEMENT)
     if run_input.get("trace_standing") is not None:
         bounds.append(TRACE_BOUND)
-    claim_bearing = sorted({str(e.get("path")) for entries in
-                            groups.values() for e in entries})
+    claim_bearing = sorted({
+        str(e.get("path"))
+        for e in groups.get("claim bearing files", [])
+        if not _entry_absent(e)
+        and _g7_claim_kind(e.get("path")) is not None})
+    missing_files = _missing_files(parsed)
     fields = {
         "1": {"tool_name": TOOL_NAME, "tool_version": TOOL_VERSION},
         "2": {"run_kind": parsed["run_kind"],
@@ -2297,9 +2672,11 @@ def compute_result(run_input):
                   e["table_name"] for e in manifest["entries"]]},
         "5": {"coverage": coverage, "receipt": receipt,
               "ignored_inputs": ignored,
+              "missing_files": missing_files,
               "claim_bearing_list": claim_bearing,
               "supplied_set": {g: sorted({str(e.get("path"))
-                                          for e in entries})
+                                          for e in entries
+                                          if not _entry_absent(e)})
                                for g, entries in groups.items()}},
         "6": {"check_results": check_results,
               "limb_results": limb_results,
@@ -2360,5 +2737,6 @@ def compute_result(run_input):
         "silence_index": {"applied_as": "an index",
                           "creates": "no word, position or outcome"},
         "absence_outcomes": _absence_outcomes(run_input),
+        "missing_files": missing_files,
     }
     return _assemble(parsed, fields, check_results, extra)

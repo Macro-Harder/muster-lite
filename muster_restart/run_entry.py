@@ -674,6 +674,213 @@ def run_invocation(invocation):
     return _finish_started_run(result_record, invocation)
 
 
+# ------------------------------------------------------------------
+# Command line reading of the named records, the S16U-01 cure.
+#
+# The kernel surface that reads content is kernel.compute_result
+# with a structured RunInput: a roster mapping carrying its seats
+# in the SeatEntry form at brief section 5.4 shape 5, and its
+# board seats apart. The command line states paths and groups
+# only, so this section reads each named roster record's content
+# and assembles that roster mapping from the content read, in the
+# two forms the governing texts state:
+#
+# 1. The structured form: a roster record whose content is a JSON
+#    document carrying seats, and board seats where it states
+#    them, in the shape 5 field form. The field contract is the
+#    recommended structured form the brief publishes at grill G6.
+# 2. The markdown roster form in use, which grill G6 states
+#    version 1 reads: seat lines standing as bullet lines under a
+#    team heading, each line naming its seat before its first
+#    colon. A seat line states no full identifier, so its holder
+#    value is carried with its kind named as not recorded, under
+#    grill G6: it counts as an entry the roster names, and it
+#    proves no distinct holder. A line under a heading stating
+#    uncounted seats carries the uncounted counting position the
+#    heading states. A seat line that states its work product in
+#    the Paper statement form the rosters in use carry, naming
+#    the product path after the words Paper:, carries that path
+#    in its work products, in the SeatEntry form at brief
+#    section 5.4 shape 5, as the structured form carries it: the
+#    product path as named in the roster record, and nothing
+#    about the product beyond the path the statement names.
+#    Where the words after Paper: do not stand as a path, the
+#    statement names no product in that form and none is
+#    assembled from it. No
+#    other content is read into the kernel input: no board seat
+#    is assembled from a markdown roster, because no markdown
+#    line form states a board holder, and no claim, coordinator
+#    identity or other structured key is assembled from prose,
+#    because no line form for those keys stands in the brief or
+#    the plan. No selection record and no author record is
+#    assembled from a markdown roster either, because no line
+#    form for either record stands in the brief, the plan or
+#    the rosters in use: the selection record stands only in
+#    the structured form, and an author record stands, where
+#    one stands, inside a work product itself, which this
+#    section does not read.
+# ------------------------------------------------------------------
+
+def _parse_roster_content(text, path):
+    """Assemble the roster mapping from one roster record's content.
+
+    Returns the mapping, or None where the content states no seat
+    in either stated form.
+    """
+    stripped = text.strip()
+    if stripped.startswith("{"):
+        try:
+            data = json.loads(stripped)
+        except ValueError:
+            data = None
+        if isinstance(data, dict) and (
+                isinstance(data.get("seats"), list)
+                or isinstance(data.get("board_seats"), list)):
+            roster = dict(data)
+            roster.setdefault("file", path)
+            return roster
+    seats = []
+    team = None
+    uncounted = False
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line.startswith("- "):
+            heading = line.lstrip("#").strip().rstrip(":")
+            lowered = heading.lower()
+            if "team" in lowered:
+                candidate = heading.split("(")[0].strip()
+                if candidate.lower().endswith("team"):
+                    team = candidate
+            if "uncounted" in lowered or "exempt" in lowered:
+                uncounted = True
+            elif line.startswith("#") or line.endswith(":"):
+                uncounted = False
+            continue
+        body = line[2:].strip()
+        label = body.split(":", 1)[0].strip().rstrip(",")
+        if not label:
+            continue
+        seat = {
+            "seat_key": "seat-%d" % (len(seats) + 1),
+            "role_name": label,
+            "agent_identifier": label,
+            "agent_kind": "not recorded",
+            "counting_position": (
+                "uncounted at this step" if uncounted
+                else "counted in base"),
+            "roster_line_location": "%s line %d" % (path, number),
+        }
+        marker = body.find("Paper: ")
+        if marker != -1:
+            words = body[marker + len("Paper: "):].split()
+            if words:
+                product = words[0].rstrip(".,;)")
+                if product and "/" in product:
+                    seat["work_products"] = [product]
+        if team is not None:
+            seat["team"] = team
+        seats.append(seat)
+    if not seats:
+        return None
+    return {"file": path, "seats": seats}
+
+
+def _assemble_content(invocation):
+    """Read the named records' content into the invocation.
+
+    Only the roster mapping is assembled, from a supplied file
+    whose name names it as the roster record, and only where the
+    invocation carries no roster already. A named file that does
+    not stand on disk is left as named; its standing is the
+    kernel's receipt and coverage matter, not this section's.
+    """
+    if "roster" in invocation:
+        return invocation
+    for entry in invocation.get("supplied_files") or []:
+        if not isinstance(entry, dict):
+            continue
+        path = entry.get("path")
+        if not path or "roster" not in Path(str(path)).name.lower():
+            continue
+        candidate = Path(str(path))
+        if not candidate.is_file():
+            continue
+        try:
+            text = candidate.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        roster = _parse_roster_content(text, str(path))
+        if roster is not None:
+            invocation["roster"] = roster
+            break
+    return invocation
+
+
+# The option names the call shape at plan section 9 states, each
+# carrying one value. No other name and no positional stands in
+# that shape.
+_KNOWN_OPTIONS = (
+    "--runner-identity", "--runner-capacity", "--stage", "--build",
+    "--tier", "--pinned-base", "--run-kind", "--supplied-file",
+)
+
+_OPTION_FIELDS = {
+    "--runner-identity": "runner_identity",
+    "--runner-capacity": "runner_capacity",
+    "--stage": "stage_judged",
+    "--build": "build",
+    "--tier": "tier",
+    "--pinned-base": "pinned_base",
+    "--run-kind": "run_kind",
+}
+
+
+def _parse_command_line(args):
+    """Parse the command line under the plan section 9 call shape.
+
+    Returns the invocation, or a cannot start outcome of kind
+    invocation where the line carries a name or a positional the
+    contract does not state, or a stated name carrying no value:
+    no argument is silently dropped, under the S16U-06 cure.
+    """
+    invocation = {"supplied_files": []}
+    index = 0
+    while index < len(args):
+        name = args[index]
+        if name not in _KNOWN_OPTIONS:
+            if name.startswith("--"):
+                cause = (
+                    "the invocation carries the name %s, which the "
+                    "call shape at plan section 9 does not state, "
+                    "so the invocation does not state a run input "
+                    "in the RunInput form" % name)
+            else:
+                cause = (
+                    "the invocation carries the positional "
+                    "argument %s, which the call shape at plan "
+                    "section 9 does not state, so the invocation "
+                    "does not state a run input in the RunInput "
+                    "form" % name)
+            return None, _cannot_start("invocation", list(args), cause)
+        if index + 1 >= len(args):
+            return None, _cannot_start(
+                "invocation", list(args),
+                "the invocation states the name %s with no value, "
+                "so the invocation does not state a run input in "
+                "the RunInput form" % name)
+        value = args[index + 1]
+        if name == "--supplied-file":
+            path, _, group = value.partition(":")
+            entry = {"path": path}
+            if group:
+                entry["group"] = group
+            invocation["supplied_files"].append(entry)
+        else:
+            invocation[_OPTION_FIELDS[name]] = value
+        index += 2
+    return invocation, None
+
+
 def main(argv=None):
     """Command form: one stage per invocation, command muster-lite.
 
@@ -683,33 +890,11 @@ def main(argv=None):
     outcome and 0 for a run that produces a result record.
     """
     args = list(sys.argv[1:] if argv is None else argv)
-    invocation = {"supplied_files": []}
-    index = 0
-    while index < len(args):
-        name = args[index]
-        value = args[index + 1] if index + 1 < len(args) else None
-        if name == "--runner-identity":
-            invocation["runner_identity"] = value
-        elif name == "--runner-capacity":
-            invocation["runner_capacity"] = value
-        elif name == "--stage":
-            invocation["stage_judged"] = value
-        elif name == "--build":
-            invocation["build"] = value
-        elif name == "--tier":
-            invocation["tier"] = value
-        elif name == "--pinned-base":
-            invocation["pinned_base"] = value
-        elif name == "--run-kind":
-            invocation["run_kind"] = value
-        elif name == "--supplied-file" and value is not None:
-            path, _, group = value.partition(":")
-            entry = {"path": path}
-            if group:
-                entry["group"] = group
-            invocation["supplied_files"].append(entry)
-        index += 2 if value is not None else 1
-    outcome = run_invocation(invocation)
+    invocation, blocked = _parse_command_line(args)
+    if blocked is not None:
+        outcome = blocked
+    else:
+        outcome = run_invocation(_assemble_content(invocation))
     record = outcome["result_record"]
     printable = {
         "kind": outcome["kind"],

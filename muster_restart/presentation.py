@@ -79,6 +79,10 @@ _GATE_CONSEQUENCE = (
     "Consequence: the rollup may be cited as gate evidence for "
     "this stage only."
 )
+_NO_ROLLUP_CONSEQUENCE = (
+    "Consequence: no rollup stands, so no rollup may be cited "
+    "as gate evidence for this stage."
+)
 _PRECHECK_LABEL = "Precheck"
 _PRECHECK_CONSEQUENCE = (
     "Consequence: a precheck is not a gate run and classifies "
@@ -100,6 +104,20 @@ _GLOSSES = {
     ),
 }
 _LINKAGE_WORDS = "not applicable: linkage did not pass for this seat"
+# The true cause text where check 1 is UNVERIFIABLE because the
+# shipped tables hold no Layer 2 row or mapping row for the
+# stage, and the repair entry standing for that cause. Neither
+# text names a seating cure, because seating an agent adds no
+# table row.
+_TABLE_CAUSE = (
+    "the shipped tables hold no Layer 2 row or mapping row "
+    "for the stage"
+)
+_TABLE_CAUSE_CURE = (
+    "no seating cure stands for this entry: %s, and seating "
+    "an agent adds no table row" % _TABLE_CAUSE
+)
+_ROSTER_ABSENT_FACT = "the absent roster record for the stage"
 _WORDS_ONLY_HEADER = (
     "PASS rollup. No team count stands in this stage, and no "
     "smallest slack stands."
@@ -190,8 +208,11 @@ def _view(result):
     carries for the counts element, and the coverage figures are
     the totals the record itself carries for the coverage element.
     Where the record carries a per group coverage standing and no
-    totals, no total stands in the reading: the coverage positions
-    carry no value, and the forms state that standing in words.
+    totals, the reading carries the per group standings as they
+    stand and the coverage totals as the sum of the per group
+    figures, group by group, so the forms print the coverage the
+    record carries and no coverage position stands empty where
+    the record carries a figure for it.
     """
     if not isinstance(result, dict):
         result = {}
@@ -274,6 +295,33 @@ def _view(result):
                 cov[key] = totals.get(key)
             elif group_key in totals:
                 cov[key] = totals.get(group_key)
+    coverage_groups = {}
+    for group, standing in coverage.items():
+        if group == "totals" or not isinstance(standing, dict):
+            continue
+        if not any(key in standing for key in (
+                "needed", "supplied", "read", "records_needed",
+                "records_supplied", "records_read")):
+            continue
+        coverage_groups[group] = {
+            "needed": standing.get(
+                "needed", standing.get("records_needed")),
+            "supplied": standing.get(
+                "supplied", standing.get("records_supplied")),
+            "read": standing.get(
+                "read", standing.get("records_read")),
+        }
+    if coverage_groups and totals is None:
+        for key, group_key in (("records_needed", "needed"),
+                               ("records_supplied", "supplied"),
+                               ("records_read", "read")):
+            figures = [standing[group_key]
+                       for standing in coverage_groups.values()]
+            if figures and all(
+                    isinstance(figure, int)
+                    and not isinstance(figure, bool)
+                    for figure in figures):
+                cov[key] = sum(figures)
 
     receipt = []
     raw_receipt = _field(result, 5, "receipt")
@@ -401,8 +449,55 @@ def _view(result):
         if isinstance(field10, str) and "listed" in field10:
             listed = True
 
+    field7 = field_dict(7)
+    stage_count = field7.get("stage_count")
+    if not isinstance(stage_count, dict):
+        stage_count = result.get("stage_count")
+    stage_count = stage_count if isinstance(stage_count, dict) \
+        else None
+    absence_words = field7.get("absence_words")
+    if not isinstance(absence_words, str) or not absence_words:
+        absence_words = None
+    if absence_words is None and isinstance(stage_count, dict):
+        carried = stage_count.get("absence_words")
+        if isinstance(carried, str) and carried:
+            absence_words = carried
+
+    missing_files = []
+    field5 = fields.get("5")
+    raw_missing = field5.get("missing_files") \
+        if isinstance(field5, dict) else None
+    if raw_missing is None:
+        raw_missing = _field(result, 5, "missing_files")
+    if raw_missing is None:
+        raw_missing = result.get("missing_files")
+    if isinstance(raw_missing, list):
+        for entry in raw_missing:
+            if isinstance(entry, dict):
+                name = entry.get("path") or entry.get("name")
+            else:
+                name = entry
+            if name:
+                missing_files.append(str(name))
+
+    roster_absent = any(
+        isinstance(entry.get("missing_fact"), str)
+        and _ROSTER_ABSENT_FACT in entry["missing_fact"]
+        for entry in checks)
+    table_absence = False
+    for entry in checks:
+        if _check_label(entry) != "check 1":
+            continue
+        fact = entry.get("missing_fact")
+        if isinstance(fact, str) and "Layer 2 row" in fact \
+                and "mapping row" in fact \
+                and _check_verdict(entry) == "UNVERIFIABLE":
+            table_absence = True
+    if absence_words and "no Layer 2 row" in absence_words \
+            and "no mapping row" in absence_words:
+        table_absence = True
+
     primary = counts[0] if counts else {}
-    first_verdict = _check_verdict(checks[0]) if checks else None
     return {
         "record": result,
         "run_kind": run_kind,
@@ -416,10 +511,15 @@ def _view(result):
         "open_case": open_case,
         "listed_not_run": listed,
         "checks": checks,
-        "first_verdict": first_verdict,
         "counts": counts,
+        "stage_count": stage_count,
+        "absence_words": absence_words,
+        "missing_files": missing_files,
+        "roster_absent": roster_absent,
+        "table_absence": table_absence,
         "primary_count": primary,
         "coverage": cov,
+        "coverage_groups": coverage_groups,
         "receipt": receipt,
         "ignored": ignored,
         "field9": field9,
@@ -459,7 +559,9 @@ def _rollup_line(view, gloss):
     if view["is_precheck"]:
         return "Rollup: %s (%s)" % (word, _PRECHECK_LABEL)
     line = "Rollup: %s" % word
-    if gloss and word in _GLOSSES:
+    if gloss and word == "UNVERIFIABLE" and view.get("table_absence"):
+        line = "%s (%s)" % (line, _TABLE_CAUSE)
+    elif gloss and word in _GLOSSES:
         line = "%s (%s)" % (line, _GLOSSES[word])
     return line
 
@@ -478,6 +580,48 @@ def _counts_line(count):
             _shown(count.get("slack")),
         )
     )
+
+
+def _counts_content(view):
+    """The counts lines content the shared elements carry.
+
+    The stage count the result record carries at field 7 prints
+    first, in its own segment, where the record carries one.
+    Where the field 7 absence words stand, no team count stands
+    for the stage: the absence words print in place of any team
+    line, so no zero count team line prints as the count of a
+    stage whose entries the stage count counted. Where a team
+    count stands and no absence words stand, the team lines
+    print as before.
+    """
+    parts = []
+    stage = view.get("stage_count")
+    if isinstance(stage, dict):
+        parts.append(
+            "Stage count: %s counted, from %s entries counted, "
+            "%s duplicates removed, %s exempt or uncounted seats "
+            "removed." % (
+                _shown(stage.get("counted_total")),
+                _shown(stage.get("entries_counted")),
+                _shown(stage.get("duplicates_removed")),
+                _shown(stage.get("exempt_or_uncounted_removed")),
+            )
+        )
+    absence = view.get("absence_words")
+    if absence:
+        parts.append(absence)
+    elif view["counts"]:
+        parts.extend(_counts_line(c) for c in view["counts"])
+    else:
+        parts.append("no team count stands in this result")
+    return "; ".join(parts)
+
+
+def _missing_files_text(view):
+    missing = view.get("missing_files") or []
+    if not missing:
+        return "none"
+    return ", ".join(str(name) for name in missing)
 
 
 def _check17_verdict(view):
@@ -583,12 +727,30 @@ def _seat_label(entry):
     return str(team) if team else "a seat"
 
 
+def _standing_missing_seats(view):
+    """The missing seat entries that stand in the forms.
+
+    A missing seat entry for check 1 resting on a table row
+    absence does not stand as a missing seat in the forms: no
+    team count stands for that stage, so no seat standing rests
+    on a team count, and the gate form and the open case form on
+    the same records state the same missing seats standing.
+    """
+    missing = view["repair"]["missing_seats"]
+    if view.get("table_absence"):
+        missing = [e for e in missing if e.get("check") != 1]
+    return missing
+
+
 def _repair_short(view):
     repair = view["repair"]
-    missing = repair["missing_seats"]
+    missing = _standing_missing_seats(view)
     duplicates = repair["duplicate_holdings"]
-    missing_text = "none" if not missing else ", ".join(
-        _seat_label(e) for e in missing)
+    if not missing and view.get("roster_absent"):
+        missing_text = "the roster record itself is absent"
+    else:
+        missing_text = "none" if not missing else ", ".join(
+            _seat_label(e) for e in missing)
     duplicate_text = "none" if not duplicates else ", ".join(
         _seat_label(e) for e in duplicates)
     return missing_text, duplicate_text
@@ -644,6 +806,62 @@ def _receipt_names_text(view):
     return ", ".join(names)
 
 
+def _coverage_statement(view):
+    """The coverage statement of the supplied set line.
+
+    The figures are the coverage figures the record carries:
+    where the record carries a per group coverage standing, the
+    statement carries the totals of those figures and, beside
+    them, each group figure as the record carries it, so no
+    figure the record carries stands missing from the form and
+    no coverage position reads not stated where the record
+    carries a figure. Where the record carries flat totals
+    alone, the statement carries those totals in their standing
+    form. Where the record carries no coverage figure at all,
+    each position states not stated, as before.
+    """
+    cov = view["coverage"]
+    totals_text = "%s records needed, %s supplied, %s read" % (
+        _shown(cov.get("records_needed")),
+        _shown(cov.get("records_supplied")),
+        _shown(cov.get("records_read")))
+    groups = view["coverage_groups"]
+    if not groups:
+        return totals_text
+    breakdown = "; ".join(
+        "%s: %s records needed, %s supplied, %s read" % (
+            group, _shown(standing["needed"]),
+            _shown(standing["supplied"]), _shown(standing["read"]))
+        for group, standing in groups.items())
+    if cov.get("records_needed") is None \
+            and cov.get("records_supplied") is None \
+            and cov.get("records_read") is None:
+        return breakdown
+    return "%s (%s)" % (totals_text, breakdown)
+
+
+def _consequence_line(view):
+    """The consequence line, plan section 9 by outcome kind.
+
+    In a precheck the precheck consequence line stands. Where a
+    rollup stands, in a completed gate run, the gate consequence
+    line stands: plan section 9 kind 1 allows the caller to cite
+    the rollup as gate evidence, and the line states only that.
+    Where no rollup stands, in an open case run under kind 2 or
+    in any run carrying no rollup word, no gate evidence
+    consequence line stands: kind 2 states the caller may not
+    treat the stage as classified on the affected checks, and
+    the line states that no rollup stands to cite.
+    """
+    if view["is_precheck"]:
+        return _PRECHECK_CONSEQUENCE
+    if view["rollup_word"] is not None \
+            and not view["open_case"] \
+            and not view["listed_not_run"]:
+        return _GATE_CONSEQUENCE
+    return _NO_ROLLUP_CONSEQUENCE
+
+
 def _shared_contents(view):
     """Content of the shared elements, keyed by canonical name.
 
@@ -670,9 +888,7 @@ def _shared_contents(view):
         ),
         "build union state line": "Build union: %s." % _text(
             view["union"], "not stated"),
-        "counts lines": "; ".join(
-            _counts_line(c) for c in view["counts"]
-        ) if view["counts"] else "no team count stands in this result",
+        "counts lines": _counts_content(view),
         "runner identity and capacity line": (
             "Runner: %s. Capacity: %s." % (
                 _text(view["runner"], "not stated"),
@@ -686,17 +902,13 @@ def _shared_contents(view):
                 missing_text, duplicate_text)
         ),
         "supplied set line with coverage statement and run receipt": (
-            "Supplied set: %s records needed, %s supplied, %s "
-            "read. Receipt: %s." % (
-                _shown(view["coverage"].get("records_needed")),
-                _shown(view["coverage"].get("records_supplied")),
-                _shown(view["coverage"].get("records_read")),
+            "Supplied set: %s. Receipt: %s. Missing files: %s." % (
+                _coverage_statement(view),
                 _receipt_names_text(view),
+                _missing_files_text(view),
             )
         ),
-        "consequence line": (
-            _PRECHECK_CONSEQUENCE if precheck else _GATE_CONSEQUENCE
-        ),
+        "consequence line": _consequence_line(view),
         "closing line": _CLOSING,
     }
     if precheck:
@@ -761,13 +973,18 @@ def _repair_rows(view):
         else:
             evidence_text = _text(
                 entry.get("evidence_file_and_seat"), "not stated")
+        cure_act = _text(entry.get("cure_act"), "not stated")
+        if view.get("table_absence") \
+                and entry.get("check") == 1 \
+                and entry.get("entry_kind") == "missing seat":
+            cure_act = _TABLE_CAUSE_CURE
         rows.append(
             "%s: check %s, rule %s, evidence %s, cure act %s" % (
                 _text(entry.get("entry_kind"), "repair entry"),
                 _shown(entry.get("check")),
                 _text(entry.get("rule"), "not stated"),
                 evidence_text,
-                _text(entry.get("cure_act"), "not stated"),
+                cure_act,
             )
         )
     return rows
@@ -840,6 +1057,8 @@ def _pass_rollup_header(view):
     """
     if view["rollup_word"] != "PASS":
         return None
+    if view.get("absence_words"):
+        return _WORDS_ONLY_HEADER
     figured = [c for c in view["counts"]
                if isinstance(c.get("slack"), int)]
     if not figured:
@@ -938,18 +1157,9 @@ def _render_advanced(view):
             for seat in view["differing"])
         roster = "%s Difference list: %s." % (roster, detail)
     contents["roster match element"] = roster
-    supplied = (
-        "Supplied set: %s records needed, %s supplied, %s read. "
-        "Receipt: %s." % (
-            _shown(view["coverage"].get("records_needed")),
-            _shown(view["coverage"].get("records_supplied")),
-            _shown(view["coverage"].get("records_read")),
-            _receipt_detail(view),
-        )
-    )
     contents[
         "supplied set line with coverage statement and run receipt"
-    ] = supplied
+    ] = _advanced_supplied(view)
 
     lines = []
     for name in CANONICAL_ELEMENTS:
@@ -974,18 +1184,29 @@ def _render_advanced(view):
 def _element_values(view):
     """The shared values every Agentic element carries, as data.
 
-    Each value is copied from the record reading: the verdict of
-    the first check the record carries, the rollup word, the
-    counts figures with their subtraction fields from the first
-    TeamCount the record carries, and the coverage figures. No
-    figure is computed and no word is selected.
+    Each value is copied from the record reading: the rollup
+    word, the counts figures with their subtraction fields from
+    the first TeamCount the record carries, and the coverage
+    figures. The verdict a shared element carries is the rollup
+    word, the one verdict that belongs to the form as a whole:
+    a shared element is not a check and carries no check verdict
+    of its own, and no element copies the verdict of the first
+    check or of any other check. The per check verdicts stand in
+    the per check results, each check carrying its own verdict
+    there. On a rollup that is not PASS no element carries PASS,
+    and where no rollup stands no element carries a verdict.
     """
     count = view["primary_count"]
+    if view.get("absence_words") \
+            and isinstance(view.get("stage_count"), dict):
+        count = view["stage_count"]
     coverage = view["coverage"]
     effective_rollup = None if view["listed_not_run"] \
         else view["rollup_word"]
+    if view["open_case"] and not view["is_precheck"]:
+        effective_rollup = None
     return {
-        "verdict": view["first_verdict"] or effective_rollup,
+        "verdict": effective_rollup,
         "rollup": effective_rollup,
         "counted_total": count.get("counted_total"),
         "entries_counted": count.get("entries_counted"),
@@ -1108,6 +1329,11 @@ def _render_agentic(view):
         "claim_differences": view["differences"],
         "receipt": view["receipt"],
         "ignored_inputs": view["ignored"],
+        "missing_files": view["missing_files"],
+        "stage_count": view["stage_count"],
+        "team_counts": [] if view.get("absence_words")
+                       else view["counts"],
+        "roster_record_absent": view["roster_absent"],
         "field_12": _field_12_text(view),
         "open_case_positions": _open_case_positions(view),
     }
@@ -1213,9 +1439,7 @@ def _counts_segment(count):
 
 
 def _counts_record_value(view):
-    if not view["counts"]:
-        return "no team count stands in this result"
-    return "; ".join(_counts_segment(c) for c in view["counts"])
+    return _strip_counts_prefix(_counts_content(view))
 
 
 def _strip_counts_prefix(text):
@@ -1251,12 +1475,10 @@ def _advanced_roster(view, contents):
 
 def _advanced_supplied(view):
     return (
-        "Supplied set: %s records needed, %s supplied, %s read. "
-        "Receipt: %s." % (
-            _shown(view["coverage"].get("records_needed")),
-            _shown(view["coverage"].get("records_supplied")),
-            _shown(view["coverage"].get("records_read")),
+        "Supplied set: %s. Receipt: %s. Missing files: %s." % (
+            _coverage_statement(view),
             _receipt_detail(view),
+            _missing_files_text(view),
         )
     )
 
@@ -1538,6 +1760,12 @@ def _compare_agentic_one(generated_form, view, skip):
          view["differences"]),
         ("receipt", "receipt", view["receipt"]),
         ("ignored inputs", "ignored_inputs", view["ignored"]),
+        ("missing files", "missing_files", view["missing_files"]),
+        ("stage count", "stage_count", view["stage_count"]),
+        ("team counts", "team_counts",
+         [] if view.get("absence_words") else view["counts"]),
+        ("roster record absent", "roster_record_absent",
+         view["roster_absent"]),
         ("field 12", "field_12", _field_12_text(view)),
         ("run kind", "run_kind", view["run_kind"] or "gate run"),
         ("open case positions", "open_case_positions",
