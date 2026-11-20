@@ -653,9 +653,10 @@ def _cannot_start_cause(invocation):
     if capacity is not None and capacity not in VALID_RUNNER_CAPACITIES:
         return _cannot_start(
             "invocation", invocation,
-            "the runner capacity stands outside the values at "
-            "brief section 5.2, so the invocation does not state "
-            "a run input in the RunInput form")
+            "the runner capacity stands outside the stated "
+            "values (%s), so the invocation does not state "
+            "a run input in the RunInput form"
+            % ", ".join(VALID_RUNNER_CAPACITIES))
     single = invocation.get("supplied_file_entry")
     if single is not None and _entry_has_no_group(single):
         return _cannot_start(
@@ -1110,16 +1111,21 @@ def _parse_command_line(args):
             if name.startswith("--"):
                 cause = (
                     "the invocation carries the name %s, which the "
-                    "call shape at plan section 9 does not state, "
+                    "call shape does not state (the stated names "
+                    "are %s, each carrying one value, and no "
+                    "positional argument stands in the shape), "
                     "so the invocation does not state a run input "
-                    "in the RunInput form" % name)
+                    "in the RunInput form"
+                    % (name, ", ".join(_KNOWN_OPTIONS)))
             else:
                 cause = (
                     "the invocation carries the positional "
-                    "argument %s, which the call shape at plan "
-                    "section 9 does not state, so the invocation "
-                    "does not state a run input in the RunInput "
-                    "form" % name)
+                    "argument %s, which the call shape does not "
+                    "state (the stated names are %s, each carrying "
+                    "one value, and no positional argument stands "
+                    "in the shape), so the invocation does not "
+                    "state a run input in the RunInput form"
+                    % (name, ", ".join(_KNOWN_OPTIONS)))
             return None, _cannot_start("invocation", list(args), cause)
         if index + 1 >= len(args):
             return None, _cannot_start(
