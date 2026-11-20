@@ -1172,6 +1172,10 @@ def _parse_command_line(args):
                 "input in the RunInput form" % name)
         if name == "--supplied-file":
             path, _, group = value.partition(":")
+            if ":" in group:
+                tail_path, _, tail_group = value.rpartition(":")
+                if tail_group in VALID_SUPPLIED_GROUPS:
+                    path, group = tail_path, tail_group
             if not path:
                 return None, _cannot_start(
                     "invocation", list(args),
