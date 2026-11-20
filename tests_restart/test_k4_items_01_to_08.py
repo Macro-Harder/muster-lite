@@ -13,7 +13,7 @@ conftest.require_kernel and on no other ground.
 import json
 from pathlib import Path
 
-from conftest import check, checks, field, result_text, run_case
+from tests_restart.conftest import check, checks, field, result_text, run_case
 
 FIXTURES = Path(__file__).parent / "fixtures"
 DERIVATION = "F5/k4_item1_derivation.json"

@@ -11,7 +11,7 @@ conftest.require_kernel and on no other ground.
 import json
 from pathlib import Path
 
-from conftest import field, load_case, require_kernel, result_text, run_case
+from tests_restart.conftest import field, load_case, require_kernel, result_text, run_case
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

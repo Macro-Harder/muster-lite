@@ -18,7 +18,7 @@ the RI-15 decoupling at the Step 13 test plan section 4.
 import json
 from pathlib import Path
 
-from conftest import check, field, load_case, require_kernel, result_text, run_case
+from tests_restart.conftest import check, field, load_case, require_kernel, result_text, run_case
 
 CASES = "F1/k5_cases.json"
 COMPOSITION = "F5/k5_composition_cases.json"

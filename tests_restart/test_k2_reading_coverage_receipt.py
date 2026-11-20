@@ -13,7 +13,7 @@ conftest.require_kernel and on no other ground.
 import json
 from pathlib import Path
 
-from conftest import field, result_text, run_case
+from tests_restart.conftest import field, result_text, run_case
 
 FIXTURES = Path(__file__).parent / "fixtures"
 COVERAGE = "F1/k2_coverage.json"

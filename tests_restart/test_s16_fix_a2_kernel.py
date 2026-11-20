@@ -8,7 +8,7 @@ S16A21-05 (per check PASS citation correspondence), with the cure
 test shapes of S16A22-02 (record limb), S16A22-04 and S16A22-05.
 """
 
-from conftest import check, field
+from tests_restart.conftest import check, field
 
 
 def _kernel():

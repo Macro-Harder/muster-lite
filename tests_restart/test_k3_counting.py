@@ -11,7 +11,7 @@ conftest.require_kernel and on no other ground.
 import json
 from pathlib import Path
 
-from conftest import check, field, result_text, run_case
+from tests_restart.conftest import check, field, result_text, run_case
 
 FIXTURES = Path(__file__).parent / "fixtures"
 STAFFED = "F1/k3_staffed_roster.json"
