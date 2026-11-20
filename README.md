@@ -184,6 +184,7 @@ stage.
 ## Potential problem causers
 
 - A run reads only the records named for it. Records that are not supplied are not checked, and a result says nothing about records that were not supplied.
+- A supplied path that stands as a symlink to a file is followed and read as the file it names, and a hard link is accepted as the file it names. Standing is judged by the named path being a file; the tool makes no link check of its own.
 - A passing result means the supplied records support the claim under the pinned rules. It does not prove that any agent was actually spawned, that work was done independently, or that the records are complete.
 - The install places 66 files, while the release contents list names 65 of them. The package file `muster_restart/__init__.py` is placed as package machinery and stands outside the contents list that the release contents sweep walks.
 - Interpreter artefact files, for example under `__pycache__` directories, can appear in a tree the product has run in. They are artefacts of a run, not product files.
