@@ -1510,6 +1510,596 @@ def _apply_pass_citations(run_input, entry):
     return entry
 
 
+def _base_entry(number):
+    composing = number in COMPOSING_CHECKS
+    return {
+        "check": number,
+        "composing": composing,
+        "composes": composing,
+        "rule": "brief section 5.5 item %d" % number,
+        "seat_or_team": None,
+        "expected_property": "the property item %d states" % number,
+        "evidence": {},
+        "verdict": "PASS",
+        "missing_fact": None,
+        "citations": [],
+    }
+
+
+def _resting_seat(entry, run_input, roster, seats,
+                    team_counts):
+    """The seat the check evidence rests on, S16A21-05.
+
+    Each check whose evidence names one seat records that
+    seat in its evidence, so the PASS citation names the
+    file, line and seat of that check, not the first seat
+    of the roster for every check. A check whose evidence
+    already names its seat keeps it.
+    """
+    evidence = entry.setdefault("evidence", {})
+    if not isinstance(evidence, dict) or "seat" in evidence:
+        return
+    number = entry["check"]
+    seat_key = None
+    if number == 1 and team_counts:
+        team = team_counts[0]
+        counted = [
+            s for s in seats
+            if s.get("team", s.get("team_name")) == team["team"]
+            and _counts_toward_minimum(s)]
+        if counted:
+            required = team["required_count"]
+            index = min(required, len(counted)) - 1 \
+                if required else 0
+            seat_key = counted[index].get("seat_key")
+    elif number == 2 and len(seats) > 1:
+        first_agent = seats[0].get("agent_identifier")
+        for seat in seats[1:]:
+            if _full_identifier_in_writing(seat) is not None and \
+                    seat.get("agent_identifier") != first_agent:
+                seat_key = seat.get("seat_key")
+                break
+    elif number == 3:
+        for seat in seats:
+            if seat.get("carried_seat_kind") not in (None, "none"):
+                seat_key = seat.get("seat_key")
+                break
+    elif number == 4:
+        board = roster.get("board_seats") or []
+        if board:
+            if board[0].get("roster_line_location"):
+                seat_key = board[0].get("seat_key")
+            else:
+                holder = board[0].get("agent_identifier")
+                for seat in seats:
+                    if seat.get("agent_identifier") == holder:
+                        seat_key = seat.get("seat_key")
+                        break
+    elif number == 5:
+        target = None
+        for team_count in team_counts:
+            if "property_conditioned_totals" in team_count:
+                target = team_count
+                break
+        if target is None and team_counts:
+            target = team_counts[0]
+        if target is not None:
+            for seat in seats:
+                if seat.get("team", seat.get("team_name")) == \
+                        target["team"]:
+                    seat_key = seat.get("seat_key")
+                    break
+    elif number == 8:
+        selection = roster.get("selection")
+        if isinstance(selection, dict):
+            holders = selection.get("holders", [])
+            if holders:
+                seat_key = holders[0].get("seat_key")
+    elif number == 11:
+        for seat in seats:
+            if isinstance(seat.get("exempt_claim"), dict):
+                seat_key = seat.get("seat_key")
+                break
+    elif number == 12:
+        author = run_input.get("author_record")
+        if isinstance(author, dict):
+            seat_key = author.get("seat_key") or author.get("seat")
+    if seats and seats[0].get("role_name") is not None and \
+            number in (2, 3, 5, 11):
+        # Markdown roster limb, the S16A21-05 residual. A
+        # roster assembled from markdown seat lines states
+        # no full identifier, no carried seat kind key and
+        # no exempt claim key: it states each seat by its
+        # role name, under its team heading, with its
+        # counting position. Where the roster stands in
+        # that form, the seat each of these checks rests on
+        # stands stated in those fields, and it is recorded
+        # here so the citation the assembly carries names
+        # it, as the structured path above already does.
+        # Checks 8 and 12 record no seat under this limb:
+        # no selection record and no author record stands
+        # in a markdown assembled roster at all, as the
+        # Fix A3 paper records in the open.
+        def role_text(seat):
+            return str(seat.get("role_name") or "").lower(
+                ).replace("-", " ")
+        if number == 2:
+            first_agent = seats[0].get("agent_identifier")
+            for seat in seats[1:]:
+                if seat.get("agent_identifier") is not None and \
+                        seat.get("agent_identifier") != first_agent:
+                    seat_key = seat.get("seat_key")
+                    break
+        elif number == 3:
+            for seat in seats:
+                text = role_text(seat)
+                if "contrarian" in text or \
+                        "fold in tracer" in text:
+                    seat_key = seat.get("seat_key")
+                    break
+        elif number == 5:
+            target = None
+            for team_count in team_counts:
+                if team_count.get("required_count") is not None:
+                    target = team_count
+                    break
+            if target is None and team_counts:
+                target = team_counts[0]
+            if target is not None:
+                for seat in seats:
+                    if seat.get("team", seat.get(
+                            "team_name")) == target["team"] and \
+                            _counts_toward_minimum(seat):
+                        seat_key = seat.get("seat_key")
+                        break
+        elif number == 11:
+            for seat in seats:
+                text = role_text(seat)
+                if seat.get("counting_position") in \
+                        ("exempt", "uncounted at this step") or \
+                        "uncounted" in text or "exempt" in text:
+                    seat_key = seat.get("seat_key")
+                    break
+    if seat_key is not None:
+        evidence["seat"] = seat_key
+
+
+def _finish_check_entry(entry, run_input, roster, seats,
+                        team_counts):
+    if entry.get("verdict") == "PASS":
+        _resting_seat(entry, run_input, roster, seats,
+                      team_counts)
+    return _apply_pass_citations(run_input, entry)
+
+
+def _checks_1_to_3(number, entry, *, derivation,
+        differing, differing_shipped, roster,
+        rounds_below, run_input, seats, step, tables,
+        team_counts, tier, unparseable):
+    if number == 1:
+        if rounds_below:
+            entry["evidence"]["rounds_below_required"] = rounds_below
+        if differing:
+            dstep, unit = differing[0]
+            entry["verdict"] = "UNVERIFIABLE"
+            if (dstep, unit) in differing_shipped:
+                entry["missing_fact"] = (
+                    "a single unit count figure for %s and %s, "
+                    "the rows stating differing figures"
+                    % (dstep, unit))
+            else:
+                entry["missing_fact"] = (
+                    "a single exception row unit count figure "
+                    "for %s and %s" % (dstep, unit))
+        elif derivation["kind"] == "out_of_sense":
+            first = derivation["out_of_sense"][0]
+            entry["verdict"] = "UNVERIFIABLE"
+            if first["part"] == "layer2":
+                entry["missing_fact"] = (
+                    "a unit count figure within the stated "
+                    "sense of a count for %s and %s"
+                    % (step, first["unit"]))
+            else:
+                entry["missing_fact"] = (
+                    "a base size figure within the stated "
+                    "sense of a count for %s at %s"
+                    % (first["team_form"], tier))
+        elif derivation["kind"] == "mapping":
+            unit = derivation["mapping_unit"]
+            entry["verdict"] = "UNVERIFIABLE"
+            entry["missing_fact"] = (
+                "the mapping row for %s and %s" % (step, unit))
+        elif derivation["layer1_team"] is not None and \
+                "stage_judged" in run_input:
+            entry["verdict"] = "UNVERIFIABLE"
+            entry["missing_fact"] = (
+                "the Layer 1 row for %s at %s"
+                % (derivation["layer1_team"], tier))
+        elif derivation.get("no_derivation"):
+            entry["verdict"] = "UNVERIFIABLE"
+            entry["missing_fact"] = (
+                "the Layer 2 row for %s and the mapping row "
+                "for %s" % (step, step))
+        elif unparseable:
+            entry["verdict"] = "NOT PROVEN"
+            if derivation["units"]:
+                entry["missing_fact"] = (
+                    "the number of seats in the counted set "
+                    "for the %s" % derivation["units"][0])
+            else:
+                entry["missing_fact"] = (
+                    "a parsed reading of the passage the run "
+                    "input carries as not parseable without "
+                    "guessing")
+        else:
+            figures = _effective_unit_counts(
+                run_input, tables, set(differing))
+            limb_done = False
+            for (row_step, unit), figure in sorted(figures.items()):
+                if row_step != step or not isinstance(figure, int):
+                    continue
+                unit_seats = [s for s in seats
+                              if s.get("unit") == unit]
+                if not unit_seats:
+                    continue
+                limb_done = True
+                counted_set = len(unit_seats)
+                if counted_set < figure:
+                    entry["verdict"] = "FAIL"
+                    entry["evidence"]["counted_set_number"] = \
+                        counted_set
+                    entry["evidence"]["figure"] = figure
+            if entry["verdict"] == "PASS" and not limb_done:
+                if rounds_below:
+                    entry["verdict"] = "FAIL"
+                elif isinstance(roster, dict) and "seats" in roster:
+                    for team_count in team_counts:
+                        required = team_count["required_count"]
+                        if required is not None and \
+                                team_count["counted_total"] < required:
+                            entry["verdict"] = "FAIL"
+                            entry["evidence"]["observed_count"] = \
+                                team_count["counted_total"]
+                            entry["evidence"]["required_count"] = \
+                                required
+                            break
+    elif number == 2:
+        if _duplicate_holdings(run_input):
+            entry["verdict"] = "FAIL"
+        else:
+            no_holder = _counted_seats_stating_no_holder(
+                run_input)
+            non_full = [s for s in seats
+                        if _full_identifier_in_writing(s) is None
+                        and s.get("agent_identifier") is not None]
+            if no_holder:
+                # S17B-02 cure: counted seats stating no
+                # holder leave the holders standing unproven
+                # on this check rather than passing at 0.
+                team = seats[0].get(
+                    "team", seats[0].get("team_name")) if seats \
+                    else None
+                required = derivation["required_by_team"].get(
+                    team)
+                if required is not None and len(seats) < required:
+                    entry["verdict"] = "FAIL"
+                else:
+                    entry["verdict"] = "NOT PROVEN"
+                    entry["missing_fact"] = (
+                        "the holders standing for the stage, "
+                        "unproven over %d counted seats stating "
+                        "no holder, by an absent or a null "
+                        "agent identifier" % len(no_holder))
+            elif non_full and seats:
+                team = seats[0].get("team", seats[0].get("team_name"))
+                required = derivation["required_by_team"].get(team)
+                proven = len({_full_identifier_in_writing(s)
+                              for s in seats
+                              if _full_identifier_in_writing(s)
+                              is not None})
+                if required is not None:
+                    if len(seats) < required:
+                        entry["verdict"] = "FAIL"
+                    elif proven < required:
+                        entry["verdict"] = "NOT PROVEN"
+                        entry["missing_fact"] = (
+                            "the holder identity for the seat "
+                            "carrying a value of a non full kind, "
+                            "in full identifier form")
+    elif number == 3:
+        carried = [s for s in seats if s.get("carried_seat_kind")
+                   not in (None, "none")]
+        if roster.get("proven_absent"):
+            entry["verdict"] = "FAIL"
+        elif carried:
+            entry["verdict"] = "PASS"
+        elif unparseable:
+            entry["verdict"] = "NOT PROVEN"
+            entry["missing_fact"] = (
+                "the presence statement for the Contrarian seat")
+
+
+def _checks_4_to_5(number, entry, *, roster, seats,
+        side, team_counts):
+    if number == 4:
+        if "board_seats" not in roster:
+            entry["verdict"] = "NOT PROVEN"
+            entry["missing_fact"] = (
+                "the board record for the stage, standing read "
+                "in the roster record")
+        else:
+            board = roster.get("board_seats") or []
+            full_holders = {s.get("agent_identifier") for s in board
+                            if s.get("agent_kind",
+                                     "full identifier")
+                            == "full identifier"}
+            non_full = [s for s in board if s.get(
+                "agent_kind", "full identifier") != "full identifier"]
+            entry["evidence"]["holders_count"] = len(full_holders)
+            entry["evidence"]["counting_kind"] = "rollup"
+            if len(full_holders) >= 3:
+                entry["verdict"] = "PASS"
+            elif non_full and \
+                    len(full_holders) + len(non_full) >= 3:
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = (
+                    "the holder identity for board seat %s in "
+                    "full identifier form"
+                    % non_full[0].get("seat_key"))
+            else:
+                entry["verdict"] = "FAIL"
+    elif number == 5:
+        entry["composing"] = True
+        entry["composes"] = True
+        target = None
+        for team_count in team_counts:
+            if "property_conditioned_totals" in team_count:
+                target = team_count
+                break
+        if target is not None:
+            totals = target["property_conditioned_totals"]
+            counted = target["counted_total"]
+            differing_prop = None
+            differing_name = None
+            for prop in ("pool family", "perspective",
+                         "qualification"):
+                total = totals[prop][
+                    "property_conditioned_counted_total"]
+                if total != counted:
+                    differing_prop = total
+                    differing_name = prop
+                    break
+            if differing_prop is not None:
+                entry["evidence"]["counted_total"] = counted
+                entry["evidence"][
+                    "property_conditioned_counted_total"] = \
+                    differing_prop
+                entry["evidence"]["property"] = differing_name
+                duplicate_perspective = False
+                if differing_name == "perspective":
+                    # The duplicate group is judged over the
+                    # counted seats of the team only, under
+                    # shape 9: the team seats in roster order,
+                    # with duplicate holdings removed first and
+                    # exempt or uncounted seats removed second,
+                    # the same partition the team count stands
+                    # on. A duplicate value standing only on a
+                    # seat outside that partition forms no group.
+                    counted_seats = []
+                    seen_agents = set()
+                    for seat in seats:
+                        if seat.get("team", seat.get(
+                                "team_name")) != target["team"]:
+                            continue
+                        agent = _full_identifier_in_writing(seat)
+                        if agent is not None:
+                            if agent in seen_agents:
+                                continue
+                            seen_agents.add(agent)
+                        counted_seats.append(seat)
+                    counted_seats = [
+                        seat for seat in counted_seats
+                        if _counts_toward_minimum(seat)]
+                    seen_values = set()
+                    for seat in counted_seats:
+                        value = seat.get("perspective")
+                        if value in (None, "not stated"):
+                            continue
+                        if value in seen_values:
+                            duplicate_perspective = True
+                            break
+                        seen_values.add(value)
+                if duplicate_perspective:
+                    entry["verdict"] = "FAIL"
+                elif totals["pool family"]["counted_seats_removed"] \
+                        or totals["qualification"][
+                            "counted_seats_removed"] \
+                        or differing_name == "perspective":
+                    entry["verdict"] = "NOT PROVEN"
+                    entry["missing_fact"] = (
+                        "a stated property standing for every "
+                        "counted seat")
+            else:
+                entry["composing"] = False
+                entry["composes"] = False
+                entry["evidence"]["counted_total"] = counted
+                entry["evidence"][
+                    "property_conditioned_counted_total"] = counted
+                side["check5_beside"] = {
+                    "result": "PASS beside the rollup",
+                    "team": target["team"]}
+
+
+def _checks_6_to_9(number, entry, *, roster, run_input,
+        seats, step, unparseable):
+    if number == 6:
+        identity = run_input.get("step_record_identity")
+        if isinstance(identity, dict):
+            if identity.get("stage") != step:
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = (
+                    "the stage coordinator identity for the "
+                    "stage judged")
+            elif identity.get("coordinator_statements_count",
+                              1) > 1:
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = (
+                    "a single stage coordinator identity")
+            elif identity.get("coordinator") in (
+                    None, "not stated") or identity.get(
+                    "coordinator_statements_count", 1) == 0:
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = (
+                    "the stage coordinator identity")
+            elif identity.get("coordinator_kind") != \
+                    "full identifier":
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = (
+                    "the stage coordinator identity in full "
+                    "identifier form")
+            elif identity.get("coordinator") in {
+                    s.get("agent_identifier") for s in seats}:
+                entry["verdict"] = "FAIL"
+    elif number == 7:
+        claims = run_input.get("report_text_claims", [])
+        claimed_no_holder = any(
+            claim.get("scope") == "Design combining"
+            and claim.get("holder_in_roster") is False
+            for claim in claims if isinstance(claim, dict))
+        if claimed_no_holder:
+            entry["verdict"] = "FAIL"
+        elif unparseable and not seats:
+            entry["verdict"] = "NOT PROVEN"
+            entry["missing_fact"] = (
+                "a holder in the roster for the combined scope")
+    elif number == 8:
+        selection = roster.get("selection")
+        if isinstance(selection, dict):
+            if selection.get("recorded") is False:
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = (
+                    "the selection recording for the affected "
+                    "seats")
+            else:
+                holders = selection.get("holders", [])
+                non_full = [h for h in holders if h.get(
+                    "holder_kind", "full identifier")
+                    != "full identifier"]
+                full = [h.get("holder") for h in holders
+                        if h.get("holder_kind", "full identifier")
+                        == "full identifier"]
+                if non_full:
+                    entry["verdict"] = "NOT PROVEN"
+                    entry["missing_fact"] = (
+                        "the holder identity for seat %s in "
+                        "full identifier form"
+                        % non_full[0].get("seat_key"))
+                elif len(full) != len(set(full)):
+                    entry["verdict"] = "FAIL"
+    elif number == 9:
+        form = run_input.get("distribution_form")
+        if form is None and isinstance(roster, dict):
+            form = roster.get("distribution_form")
+        if form is not None:
+            entry["distribution_form"] = form
+            if form not in ("by named slices", "by heads",
+                            "heads", "named slices") and \
+                    "named slices" not in str(form):
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = (
+                    "the logic audit distribution in the heads "
+                    "form or the named slices form")
+
+
+def _checks_10_to_15(number, entry, *, run_input,
+        seats, side, verification):
+    if number == 10:
+        invocations = run_input.get("invocation_records")
+        has_invocation = bool(invocations) if not isinstance(
+            invocations, int) else invocations > 0
+        if run_input.get("reduced_tier_claim") and \
+                not has_invocation:
+            entry["verdict"] = "NOT PROVEN"
+            entry["missing_fact"] = (
+                "no invocation record stands in the target "
+                "records")
+    elif number == 11:
+        entries = []
+        single = run_input.get("entry")
+        if isinstance(single, dict):
+            entries.append({
+                "label": single.get("label"),
+                "basis": single.get("basis"),
+                "counted_as_exempt": bool(single.get("label"))
+                and bool(single.get("basis")),
+            })
+        for seat in seats:
+            claim = seat.get("exempt_claim")
+            if isinstance(claim, dict):
+                label = claim.get("label") or claim.get(
+                    "roster_label_proof")
+                basis = claim.get("basis") or claim.get(
+                    "exemption_basis")
+                entries.append({
+                    "label": label, "basis": basis,
+                    "counted_as_exempt": bool(label)
+                    and bool(basis),
+                })
+        entry["entries"] = entries
+        if entries and any(not item["counted_as_exempt"]
+                           for item in entries):
+            entry["verdict"] = "NOT PROVEN"
+            entry["missing_fact"] = (
+                "both exemption proofs together, the roster "
+                "label proof and the exemption basis")
+    elif number == 12:
+        if "author_record" in run_input or \
+                "resting_record" in run_input:
+            if run_input.get("author_record") is None:
+                entry["verdict"] = "NOT PROVEN"
+                entry["missing_fact"] = (
+                    "the author record field for the seat, "
+                    "resting on the record the roster id "
+                    "rests on")
+                entry["resting_record_named"] = True
+                if run_input.get("resting_record") == \
+                        "outside the supplied set":
+                    entry["resting_record_standing"] = (
+                        "outside the supplied set, named in "
+                        "words")
+    elif number == 13:
+        if run_input.get("table_conflict"):
+            entry["verdict"] = "FAIL"
+            side["table_conflict_statement"] = (
+                "table defect, the table entry and its figure "
+                "stands in conflict with the source and its "
+                "figure, source wins")
+        elif verification["status"] == "mismatch":
+            entry["verdict"] = "FAIL"
+            side["table_conflict_statement"] = (
+                "table defect, the %s table entry and its "
+                "figure %s stands in conflict with the source "
+                "and its figure %s, source wins"
+                % (verification.get("table"),
+                   verification.get("read_hash"),
+                   verification.get("manifest_hash")))
+        elif verification["status"] == "absent":
+            entry["verdict"] = "NOT PROVEN"
+            entry["missing_fact"] = (
+                "the listed table %s standing for the run"
+                % verification.get("table"))
+    elif number == 14:
+        entry["composing"] = False
+        entry["composes"] = False
+        colour = run_input.get("colour_result")
+        if colour in ("PASS", "FAIL", "NOT PROVEN",
+                      "UNVERIFIABLE"):
+            entry["verdict"] = colour
+    elif number == 15:
+        entry["composing"] = False
+        entry["composes"] = False
+
+
 def _check_results(run_input, differing, reading, verification,
                    base_standing, tables=None, team_counts=None,
                    parsed=None, differing_shipped=()):
@@ -1543,169 +2133,13 @@ def _check_results(run_input, differing, reading, verification,
     plaid_tier = tier == "Plaid"
     side = {"check5_beside": None, "table_conflict_statement": None}
 
-    def base_entry(number):
-        composing = number in COMPOSING_CHECKS
-        return {
-            "check": number,
-            "composing": composing,
-            "composes": composing,
-            "rule": "brief section 5.5 item %d" % number,
-            "seat_or_team": None,
-            "expected_property": "the property item %d states" % number,
-            "evidence": {},
-            "verdict": "PASS",
-            "missing_fact": None,
-            "citations": [],
-        }
-
-    def resting_seat(entry):
-        """The seat the check evidence rests on, S16A21-05.
-
-        Each check whose evidence names one seat records that
-        seat in its evidence, so the PASS citation names the
-        file, line and seat of that check, not the first seat
-        of the roster for every check. A check whose evidence
-        already names its seat keeps it.
-        """
-        evidence = entry.setdefault("evidence", {})
-        if not isinstance(evidence, dict) or "seat" in evidence:
-            return
-        number = entry["check"]
-        seat_key = None
-        if number == 1 and team_counts:
-            team = team_counts[0]
-            counted = [
-                s for s in seats
-                if s.get("team", s.get("team_name")) == team["team"]
-                and _counts_toward_minimum(s)]
-            if counted:
-                required = team["required_count"]
-                index = min(required, len(counted)) - 1 \
-                    if required else 0
-                seat_key = counted[index].get("seat_key")
-        elif number == 2 and len(seats) > 1:
-            first_agent = seats[0].get("agent_identifier")
-            for seat in seats[1:]:
-                if _full_identifier_in_writing(seat) is not None and \
-                        seat.get("agent_identifier") != first_agent:
-                    seat_key = seat.get("seat_key")
-                    break
-        elif number == 3:
-            for seat in seats:
-                if seat.get("carried_seat_kind") not in (None, "none"):
-                    seat_key = seat.get("seat_key")
-                    break
-        elif number == 4:
-            board = roster.get("board_seats") or []
-            if board:
-                if board[0].get("roster_line_location"):
-                    seat_key = board[0].get("seat_key")
-                else:
-                    holder = board[0].get("agent_identifier")
-                    for seat in seats:
-                        if seat.get("agent_identifier") == holder:
-                            seat_key = seat.get("seat_key")
-                            break
-        elif number == 5:
-            target = None
-            for team_count in team_counts:
-                if "property_conditioned_totals" in team_count:
-                    target = team_count
-                    break
-            if target is None and team_counts:
-                target = team_counts[0]
-            if target is not None:
-                for seat in seats:
-                    if seat.get("team", seat.get("team_name")) == \
-                            target["team"]:
-                        seat_key = seat.get("seat_key")
-                        break
-        elif number == 8:
-            selection = roster.get("selection")
-            if isinstance(selection, dict):
-                holders = selection.get("holders", [])
-                if holders:
-                    seat_key = holders[0].get("seat_key")
-        elif number == 11:
-            for seat in seats:
-                if isinstance(seat.get("exempt_claim"), dict):
-                    seat_key = seat.get("seat_key")
-                    break
-        elif number == 12:
-            author = run_input.get("author_record")
-            if isinstance(author, dict):
-                seat_key = author.get("seat_key") or author.get("seat")
-        if seats and seats[0].get("role_name") is not None and \
-                number in (2, 3, 5, 11):
-            # Markdown roster limb, the S16A21-05 residual. A
-            # roster assembled from markdown seat lines states
-            # no full identifier, no carried seat kind key and
-            # no exempt claim key: it states each seat by its
-            # role name, under its team heading, with its
-            # counting position. Where the roster stands in
-            # that form, the seat each of these checks rests on
-            # stands stated in those fields, and it is recorded
-            # here so the citation the assembly carries names
-            # it, as the structured path above already does.
-            # Checks 8 and 12 record no seat under this limb:
-            # no selection record and no author record stands
-            # in a markdown assembled roster at all, as the
-            # Fix A3 paper records in the open.
-            def role_text(seat):
-                return str(seat.get("role_name") or "").lower(
-                    ).replace("-", " ")
-            if number == 2:
-                first_agent = seats[0].get("agent_identifier")
-                for seat in seats[1:]:
-                    if seat.get("agent_identifier") is not None and \
-                            seat.get("agent_identifier") != first_agent:
-                        seat_key = seat.get("seat_key")
-                        break
-            elif number == 3:
-                for seat in seats:
-                    text = role_text(seat)
-                    if "contrarian" in text or \
-                            "fold in tracer" in text:
-                        seat_key = seat.get("seat_key")
-                        break
-            elif number == 5:
-                target = None
-                for team_count in team_counts:
-                    if team_count.get("required_count") is not None:
-                        target = team_count
-                        break
-                if target is None and team_counts:
-                    target = team_counts[0]
-                if target is not None:
-                    for seat in seats:
-                        if seat.get("team", seat.get(
-                                "team_name")) == target["team"] and \
-                                _counts_toward_minimum(seat):
-                            seat_key = seat.get("seat_key")
-                            break
-            elif number == 11:
-                for seat in seats:
-                    text = role_text(seat)
-                    if seat.get("counting_position") in \
-                            ("exempt", "uncounted at this step") or \
-                            "uncounted" in text or "exempt" in text:
-                        seat_key = seat.get("seat_key")
-                        break
-        if seat_key is not None:
-            evidence["seat"] = seat_key
-
-    def finish(entry):
-        if entry.get("verdict") == "PASS":
-            resting_seat(entry)
-        return _apply_pass_citations(run_input, entry)
-
     results = []
     for number in CHECK_ORDER:
         if plaid_tier and number == 1:
             continue
         if precheck and number in (10, 12, 16):
             continue
-        entry = base_entry(number)
+        entry = _base_entry(number)
         if base_standing["kind"] == "words_alone":
             entry["verdict"] = "OPEN CASE"
             results.append(entry)
@@ -1721,416 +2155,25 @@ def _check_results(run_input, differing, reading, verification,
                 "a verified counting table standing for the run")
             results.append(entry)
             continue
-        if number == 1:
-            if rounds_below:
-                entry["evidence"]["rounds_below_required"] = rounds_below
-            if differing:
-                dstep, unit = differing[0]
-                entry["verdict"] = "UNVERIFIABLE"
-                if (dstep, unit) in differing_shipped:
-                    entry["missing_fact"] = (
-                        "a single unit count figure for %s and %s, "
-                        "the rows stating differing figures"
-                        % (dstep, unit))
-                else:
-                    entry["missing_fact"] = (
-                        "a single exception row unit count figure "
-                        "for %s and %s" % (dstep, unit))
-            elif derivation["kind"] == "out_of_sense":
-                first = derivation["out_of_sense"][0]
-                entry["verdict"] = "UNVERIFIABLE"
-                if first["part"] == "layer2":
-                    entry["missing_fact"] = (
-                        "a unit count figure within the stated "
-                        "sense of a count for %s and %s"
-                        % (step, first["unit"]))
-                else:
-                    entry["missing_fact"] = (
-                        "a base size figure within the stated "
-                        "sense of a count for %s at %s"
-                        % (first["team_form"], tier))
-            elif derivation["kind"] == "mapping":
-                unit = derivation["mapping_unit"]
-                entry["verdict"] = "UNVERIFIABLE"
-                entry["missing_fact"] = (
-                    "the mapping row for %s and %s" % (step, unit))
-            elif derivation["layer1_team"] is not None and \
-                    "stage_judged" in run_input:
-                entry["verdict"] = "UNVERIFIABLE"
-                entry["missing_fact"] = (
-                    "the Layer 1 row for %s at %s"
-                    % (derivation["layer1_team"], tier))
-            elif derivation.get("no_derivation"):
-                entry["verdict"] = "UNVERIFIABLE"
-                entry["missing_fact"] = (
-                    "the Layer 2 row for %s and the mapping row "
-                    "for %s" % (step, step))
-            elif unparseable:
-                entry["verdict"] = "NOT PROVEN"
-                if derivation["units"]:
-                    entry["missing_fact"] = (
-                        "the number of seats in the counted set "
-                        "for the %s" % derivation["units"][0])
-                else:
-                    entry["missing_fact"] = (
-                        "a parsed reading of the passage the run "
-                        "input carries as not parseable without "
-                        "guessing")
-            else:
-                figures = _effective_unit_counts(
-                    run_input, tables, set(differing))
-                limb_done = False
-                for (row_step, unit), figure in sorted(figures.items()):
-                    if row_step != step or not isinstance(figure, int):
-                        continue
-                    unit_seats = [s for s in seats
-                                  if s.get("unit") == unit]
-                    if not unit_seats:
-                        continue
-                    limb_done = True
-                    counted_set = len(unit_seats)
-                    if counted_set < figure:
-                        entry["verdict"] = "FAIL"
-                        entry["evidence"]["counted_set_number"] = \
-                            counted_set
-                        entry["evidence"]["figure"] = figure
-                if entry["verdict"] == "PASS" and not limb_done:
-                    if rounds_below:
-                        entry["verdict"] = "FAIL"
-                    elif isinstance(roster, dict) and "seats" in roster:
-                        for team_count in team_counts:
-                            required = team_count["required_count"]
-                            if required is not None and \
-                                    team_count["counted_total"] < required:
-                                entry["verdict"] = "FAIL"
-                                entry["evidence"]["observed_count"] = \
-                                    team_count["counted_total"]
-                                entry["evidence"]["required_count"] = \
-                                    required
-                                break
-        elif number == 2:
-            if _duplicate_holdings(run_input):
-                entry["verdict"] = "FAIL"
-            else:
-                no_holder = _counted_seats_stating_no_holder(
-                    run_input)
-                non_full = [s for s in seats
-                            if _full_identifier_in_writing(s) is None
-                            and s.get("agent_identifier") is not None]
-                if no_holder:
-                    # S17B-02 cure: counted seats stating no
-                    # holder leave the holders standing unproven
-                    # on this check rather than passing at 0.
-                    team = seats[0].get(
-                        "team", seats[0].get("team_name")) if seats \
-                        else None
-                    required = derivation["required_by_team"].get(
-                        team)
-                    if required is not None and len(seats) < required:
-                        entry["verdict"] = "FAIL"
-                    else:
-                        entry["verdict"] = "NOT PROVEN"
-                        entry["missing_fact"] = (
-                            "the holders standing for the stage, "
-                            "unproven over %d counted seats stating "
-                            "no holder, by an absent or a null "
-                            "agent identifier" % len(no_holder))
-                elif non_full and seats:
-                    team = seats[0].get("team", seats[0].get("team_name"))
-                    required = derivation["required_by_team"].get(team)
-                    proven = len({_full_identifier_in_writing(s)
-                                  for s in seats
-                                  if _full_identifier_in_writing(s)
-                                  is not None})
-                    if required is not None:
-                        if len(seats) < required:
-                            entry["verdict"] = "FAIL"
-                        elif proven < required:
-                            entry["verdict"] = "NOT PROVEN"
-                            entry["missing_fact"] = (
-                                "the holder identity for the seat "
-                                "carrying a value of a non full kind, "
-                                "in full identifier form")
-        elif number == 3:
-            carried = [s for s in seats if s.get("carried_seat_kind")
-                       not in (None, "none")]
-            if roster.get("proven_absent"):
-                entry["verdict"] = "FAIL"
-            elif carried:
-                entry["verdict"] = "PASS"
-            elif unparseable:
-                entry["verdict"] = "NOT PROVEN"
-                entry["missing_fact"] = (
-                    "the presence statement for the Contrarian seat")
-        elif number == 4:
-            if "board_seats" not in roster:
-                entry["verdict"] = "NOT PROVEN"
-                entry["missing_fact"] = (
-                    "the board record for the stage, standing read "
-                    "in the roster record")
-            else:
-                board = roster.get("board_seats") or []
-                full_holders = {s.get("agent_identifier") for s in board
-                                if s.get("agent_kind",
-                                         "full identifier")
-                                == "full identifier"}
-                non_full = [s for s in board if s.get(
-                    "agent_kind", "full identifier") != "full identifier"]
-                entry["evidence"]["holders_count"] = len(full_holders)
-                entry["evidence"]["counting_kind"] = "rollup"
-                if len(full_holders) >= 3:
-                    entry["verdict"] = "PASS"
-                elif non_full and \
-                        len(full_holders) + len(non_full) >= 3:
-                    entry["verdict"] = "NOT PROVEN"
-                    entry["missing_fact"] = (
-                        "the holder identity for board seat %s in "
-                        "full identifier form"
-                        % non_full[0].get("seat_key"))
-                else:
-                    entry["verdict"] = "FAIL"
-        elif number == 5:
-            entry["composing"] = True
-            entry["composes"] = True
-            target = None
-            for team_count in team_counts:
-                if "property_conditioned_totals" in team_count:
-                    target = team_count
-                    break
-            if target is not None:
-                totals = target["property_conditioned_totals"]
-                counted = target["counted_total"]
-                differing_prop = None
-                differing_name = None
-                for prop in ("pool family", "perspective",
-                             "qualification"):
-                    total = totals[prop][
-                        "property_conditioned_counted_total"]
-                    if total != counted:
-                        differing_prop = total
-                        differing_name = prop
-                        break
-                if differing_prop is not None:
-                    entry["evidence"]["counted_total"] = counted
-                    entry["evidence"][
-                        "property_conditioned_counted_total"] = \
-                        differing_prop
-                    entry["evidence"]["property"] = differing_name
-                    duplicate_perspective = False
-                    if differing_name == "perspective":
-                        # The duplicate group is judged over the
-                        # counted seats of the team only, under
-                        # shape 9: the team seats in roster order,
-                        # with duplicate holdings removed first and
-                        # exempt or uncounted seats removed second,
-                        # the same partition the team count stands
-                        # on. A duplicate value standing only on a
-                        # seat outside that partition forms no group.
-                        counted_seats = []
-                        seen_agents = set()
-                        for seat in seats:
-                            if seat.get("team", seat.get(
-                                    "team_name")) != target["team"]:
-                                continue
-                            agent = _full_identifier_in_writing(seat)
-                            if agent is not None:
-                                if agent in seen_agents:
-                                    continue
-                                seen_agents.add(agent)
-                            counted_seats.append(seat)
-                        counted_seats = [
-                            seat for seat in counted_seats
-                            if _counts_toward_minimum(seat)]
-                        seen_values = set()
-                        for seat in counted_seats:
-                            value = seat.get("perspective")
-                            if value in (None, "not stated"):
-                                continue
-                            if value in seen_values:
-                                duplicate_perspective = True
-                                break
-                            seen_values.add(value)
-                    if duplicate_perspective:
-                        entry["verdict"] = "FAIL"
-                    elif totals["pool family"]["counted_seats_removed"] \
-                            or totals["qualification"][
-                                "counted_seats_removed"] \
-                            or differing_name == "perspective":
-                        entry["verdict"] = "NOT PROVEN"
-                        entry["missing_fact"] = (
-                            "a stated property standing for every "
-                            "counted seat")
-                else:
-                    entry["composing"] = False
-                    entry["composes"] = False
-                    entry["evidence"]["counted_total"] = counted
-                    entry["evidence"][
-                        "property_conditioned_counted_total"] = counted
-                    side["check5_beside"] = {
-                        "result": "PASS beside the rollup",
-                        "team": target["team"]}
-        elif number == 6:
-            identity = run_input.get("step_record_identity")
-            if isinstance(identity, dict):
-                if identity.get("stage") != step:
-                    entry["verdict"] = "NOT PROVEN"
-                    entry["missing_fact"] = (
-                        "the stage coordinator identity for the "
-                        "stage judged")
-                elif identity.get("coordinator_statements_count",
-                                  1) > 1:
-                    entry["verdict"] = "NOT PROVEN"
-                    entry["missing_fact"] = (
-                        "a single stage coordinator identity")
-                elif identity.get("coordinator") in (
-                        None, "not stated") or identity.get(
-                        "coordinator_statements_count", 1) == 0:
-                    entry["verdict"] = "NOT PROVEN"
-                    entry["missing_fact"] = (
-                        "the stage coordinator identity")
-                elif identity.get("coordinator_kind") != \
-                        "full identifier":
-                    entry["verdict"] = "NOT PROVEN"
-                    entry["missing_fact"] = (
-                        "the stage coordinator identity in full "
-                        "identifier form")
-                elif identity.get("coordinator") in {
-                        s.get("agent_identifier") for s in seats}:
-                    entry["verdict"] = "FAIL"
-        elif number == 7:
-            claims = run_input.get("report_text_claims", [])
-            claimed_no_holder = any(
-                claim.get("scope") == "Design combining"
-                and claim.get("holder_in_roster") is False
-                for claim in claims if isinstance(claim, dict))
-            if claimed_no_holder:
-                entry["verdict"] = "FAIL"
-            elif unparseable and not seats:
-                entry["verdict"] = "NOT PROVEN"
-                entry["missing_fact"] = (
-                    "a holder in the roster for the combined scope")
-        elif number == 8:
-            selection = roster.get("selection")
-            if isinstance(selection, dict):
-                if selection.get("recorded") is False:
-                    entry["verdict"] = "NOT PROVEN"
-                    entry["missing_fact"] = (
-                        "the selection recording for the affected "
-                        "seats")
-                else:
-                    holders = selection.get("holders", [])
-                    non_full = [h for h in holders if h.get(
-                        "holder_kind", "full identifier")
-                        != "full identifier"]
-                    full = [h.get("holder") for h in holders
-                            if h.get("holder_kind", "full identifier")
-                            == "full identifier"]
-                    if non_full:
-                        entry["verdict"] = "NOT PROVEN"
-                        entry["missing_fact"] = (
-                            "the holder identity for seat %s in "
-                            "full identifier form"
-                            % non_full[0].get("seat_key"))
-                    elif len(full) != len(set(full)):
-                        entry["verdict"] = "FAIL"
-        elif number == 9:
-            form = run_input.get("distribution_form")
-            if form is None and isinstance(roster, dict):
-                form = roster.get("distribution_form")
-            if form is not None:
-                entry["distribution_form"] = form
-                if form not in ("by named slices", "by heads",
-                                "heads", "named slices") and \
-                        "named slices" not in str(form):
-                    entry["verdict"] = "NOT PROVEN"
-                    entry["missing_fact"] = (
-                        "the logic audit distribution in the heads "
-                        "form or the named slices form")
-        elif number == 10:
-            invocations = run_input.get("invocation_records")
-            has_invocation = bool(invocations) if not isinstance(
-                invocations, int) else invocations > 0
-            if run_input.get("reduced_tier_claim") and \
-                    not has_invocation:
-                entry["verdict"] = "NOT PROVEN"
-                entry["missing_fact"] = (
-                    "no invocation record stands in the target "
-                    "records")
-        elif number == 11:
-            entries = []
-            single = run_input.get("entry")
-            if isinstance(single, dict):
-                entries.append({
-                    "label": single.get("label"),
-                    "basis": single.get("basis"),
-                    "counted_as_exempt": bool(single.get("label"))
-                    and bool(single.get("basis")),
-                })
-            for seat in seats:
-                claim = seat.get("exempt_claim")
-                if isinstance(claim, dict):
-                    label = claim.get("label") or claim.get(
-                        "roster_label_proof")
-                    basis = claim.get("basis") or claim.get(
-                        "exemption_basis")
-                    entries.append({
-                        "label": label, "basis": basis,
-                        "counted_as_exempt": bool(label)
-                        and bool(basis),
-                    })
-            entry["entries"] = entries
-            if entries and any(not item["counted_as_exempt"]
-                               for item in entries):
-                entry["verdict"] = "NOT PROVEN"
-                entry["missing_fact"] = (
-                    "both exemption proofs together, the roster "
-                    "label proof and the exemption basis")
-        elif number == 12:
-            if "author_record" in run_input or \
-                    "resting_record" in run_input:
-                if run_input.get("author_record") is None:
-                    entry["verdict"] = "NOT PROVEN"
-                    entry["missing_fact"] = (
-                        "the author record field for the seat, "
-                        "resting on the record the roster id "
-                        "rests on")
-                    entry["resting_record_named"] = True
-                    if run_input.get("resting_record") == \
-                            "outside the supplied set":
-                        entry["resting_record_standing"] = (
-                            "outside the supplied set, named in "
-                            "words")
-        elif number == 13:
-            if run_input.get("table_conflict"):
-                entry["verdict"] = "FAIL"
-                side["table_conflict_statement"] = (
-                    "table defect, the table entry and its figure "
-                    "stands in conflict with the source and its "
-                    "figure, source wins")
-            elif verification["status"] == "mismatch":
-                entry["verdict"] = "FAIL"
-                side["table_conflict_statement"] = (
-                    "table defect, the %s table entry and its "
-                    "figure %s stands in conflict with the source "
-                    "and its figure %s, source wins"
-                    % (verification.get("table"),
-                       verification.get("read_hash"),
-                       verification.get("manifest_hash")))
-            elif verification["status"] == "absent":
-                entry["verdict"] = "NOT PROVEN"
-                entry["missing_fact"] = (
-                    "the listed table %s standing for the run"
-                    % verification.get("table"))
-        elif number == 14:
-            entry["composing"] = False
-            entry["composes"] = False
-            colour = run_input.get("colour_result")
-            if colour in ("PASS", "FAIL", "NOT PROVEN",
-                          "UNVERIFIABLE"):
-                entry["verdict"] = colour
-        elif number == 15:
-            entry["composing"] = False
-            entry["composes"] = False
+        _checks_1_to_3(
+            number, entry, derivation=derivation,
+            differing=differing,
+            differing_shipped=differing_shipped,
+            roster=roster, rounds_below=rounds_below,
+            run_input=run_input, seats=seats, step=step,
+            tables=tables, team_counts=team_counts,
+            tier=tier, unparseable=unparseable)
+        _checks_4_to_5(number, entry, roster=roster,
+                       seats=seats, side=side,
+                       team_counts=team_counts)
+        _checks_6_to_9(number, entry, roster=roster,
+                       run_input=run_input, seats=seats,
+                       step=step,
+                       unparseable=unparseable)
+        _checks_10_to_15(number, entry,
+                         run_input=run_input,
+                         seats=seats, side=side,
+                         verification=verification)
         if number == 1 and entry["verdict"] == "PASS":
             # S17B-15 cure: two seats in one roster carrying one
             # seat key stand proven on the roster the run reads,
@@ -2176,7 +2219,9 @@ def _check_results(run_input, differing, reading, verification,
                 entry["verdict"] = "UNVERIFIABLE"
                 entry["missing_fact"] = ROSTER_ABSENT_MISSING_FACT
             entry["citations"] = []
-        results.append(finish(entry))
+        results.append(_finish_check_entry(
+            entry, run_input, roster, seats,
+            team_counts))
     return results, side
 
 
