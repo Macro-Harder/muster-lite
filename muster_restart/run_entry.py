@@ -870,6 +870,20 @@ def _merge_roster(invocation, roster, ordinal):
         standing.setdefault("board_seats", []).extend(board)
 
 
+def _file_within_read_cap(candidate):
+    """Whether a standing file is small enough for the tool to
+    read, under the kernel read cap. A named file standing
+    larger than the cap is not read; the invocation carries the
+    tool failure marker and the run ends as a cannot start run
+    of kind tool failure, as the audit fix for the unbounded
+    read states."""
+    try:
+        return candidate.stat().st_size <= \
+            _kernel_module.MAX_READ_BYTES
+    except OSError:
+        return False
+
+
 def _assemble_content(invocation):
     """Read the named records' content into the invocation.
 
@@ -904,6 +918,9 @@ def _assemble_content(invocation):
         candidate = Path(str(path))
         if not candidate.is_file():
             continue
+        if not _file_within_read_cap(candidate):
+            invocation["tool_failure_before_result"] = True
+            continue
         try:
             text = candidate.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -922,6 +939,9 @@ def _assemble_content(invocation):
             continue
         candidate = Path(str(path))
         if not candidate.is_file():
+            continue
+        if not _file_within_read_cap(candidate):
+            invocation["tool_failure_before_result"] = True
             continue
         try:
             text = candidate.read_text(encoding="utf-8")
@@ -977,6 +997,8 @@ def _input_defect_outcome(invocation, args):
             continue
         candidate = Path(str(path))
         if not candidate.is_file():
+            continue
+        if not _file_within_read_cap(candidate):
             continue
         try:
             candidate.read_bytes()
@@ -1223,8 +1245,14 @@ def main(argv=None):
     if blocked is not None:
         outcome = blocked
     else:
-        assembled = _assemble_content(invocation)
-        defect = _input_defect_outcome(assembled, args)
+        try:
+            assembled = _assemble_content(invocation)
+            defect = _input_defect_outcome(assembled, args)
+        except MemoryError:
+            defect = _cannot_start(
+                "tool failure", args,
+                "a failure of the tool itself before a result "
+                "record stands")
         if defect is not None:
             outcome = defect
         else:

@@ -718,6 +718,24 @@ def _coverage(run_input, parsed, groups):
     return coverage
 
 
+# The largest file content the tool reads into memory, in bytes.
+# The records the tool checks are text records, and this cap
+# stands far above any record in use and far below a size whose
+# reading can exhaust memory. A standing file larger than the
+# cap is not read: the receipt takes no hash and no byte size
+# from it, and the run entry ends an invocation naming one as a
+# cannot start run of kind tool failure.
+MAX_READ_BYTES = 16 * 1024 * 1024
+
+
+def _file_bytes_within_cap(candidate):
+    """The bytes of a standing regular file, or None where the
+    file stands larger than MAX_READ_BYTES and is not read."""
+    if candidate.stat().st_size > MAX_READ_BYTES:
+        return None
+    return candidate.read_bytes()
+
+
 def _receipt_and_ignored(parsed, groups):
     """ReceiptEntry collection and the ignored inputs list.
 
@@ -754,8 +772,9 @@ def _receipt_and_ignored(parsed, groups):
             else:
                 candidate = Path(path)
                 if candidate.is_file():
-                    digest = hashlib.sha256(
-                        candidate.read_bytes()).hexdigest()
+                    raw = _file_bytes_within_cap(candidate)
+                    digest = hashlib.sha256(raw).hexdigest() \
+                        if raw is not None else NO_HASH_STANDING
                 else:
                     digest = NO_HASH_STANDING
             if entry.get("byte_size") is not None:
@@ -765,8 +784,12 @@ def _receipt_and_ignored(parsed, groups):
                     content, str) else len(bytes(content))
             else:
                 candidate = Path(path)
-                size = len(candidate.read_bytes()) if candidate.is_file() \
-                    else NO_BYTE_SIZE_STANDING
+                if candidate.is_file():
+                    raw = _file_bytes_within_cap(candidate)
+                    size = len(raw) if raw is not None \
+                        else NO_BYTE_SIZE_STANDING
+                else:
+                    size = NO_BYTE_SIZE_STANDING
             receipt.append({
                 "file_path": path,
                 "file_name": Path(path).name,
