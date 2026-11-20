@@ -1382,12 +1382,14 @@ def _roster_absent(run_input):
 
 
 # The evidence keys of checks 10 and 12 to 16, S16A21-04 kernel
-# limb: on a bare absence (no roster record stands, the supplied
-# set is empty, and no evidence of the check itself stands in the
-# run input) a PASS default of one of these checks is a PASS the
-# evidence does not earn. Where evidence of the check stands in
-# the run input, the run is not at bare absence for that check and
-# its own branch words govern.
+# limb: on a bare absence (no roster record stands and no
+# evidence of the check itself stands in the run input) a PASS
+# default of one of these checks is a PASS the evidence does not
+# earn. A stated supplied set whose files assemble no roster
+# record leaves the absence bare: the supplied names alone are
+# not evidence of any of these checks. Where evidence of the
+# check stands in the run input, the run is not at bare absence
+# for that check and its own branch words govern.
 _BARE_ABSENCE_EVIDENCE_KEYS = {
     10: ("reduced_tier_claim", "invocation_records"),
     12: ("author_record", "resting_record"),
@@ -1409,8 +1411,6 @@ def _bare_absence_for_check(run_input, number):
     if keys is None:
         return False
     if not _roster_absent(run_input):
-        return False
-    if run_input.get("supplied_files"):
         return False
     if "composing_check_words" in run_input:
         return False
