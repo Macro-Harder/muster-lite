@@ -101,14 +101,14 @@ PYTHONPATH=repo python3 -m muster_restart.run_entry \
     --runner-identity "A. Auditor" \
     --runner-capacity Auditor \
     --build muster-lite \
-    --stage "Step 14" \
+    --stage "Step 13" \
     --tier Low \
-    --supplied-file records/step-14-roster.md:"stage records" \
-    --supplied-file records/step-14-roster.md:"claim bearing files" \
-    --supplied-file records/step-14-record.md:"stage records" \
-    --supplied-file records/step-14-record.md:"claim bearing files" \
+    --supplied-file records/step-13-roster.md:"stage records" \
+    --supplied-file records/step-13-roster.md:"claim bearing files" \
+    --supplied-file records/step-13-record.md:"stage records" \
+    --supplied-file records/step-13-record.md:"claim bearing files" \
     --supplied-file records/TIER-RECORD.md:"stage records" \
-    --supplied-file records/step-14-gate-record.md:"claim bearing files"
+    --supplied-file records/step-13-gate-record.md:"claim bearing files"
 ```
 
 The arguments state exactly the run input fields, and nothing
@@ -184,6 +184,7 @@ stage.
 ## Potential problem causers
 
 - A run reads only the records named for it. Records that are not supplied are not checked, and a result says nothing about records that were not supplied.
+- The pinned counting tables cover Step 13, the Low tier and the Design team only. A stage, tier or team form beyond those rows gets no team count from the tables, and its first check ends UNVERIFIABLE for want of a table row.
 - A passing result means the supplied records support the claim under the pinned rules. It does not prove that any agent was actually spawned, that work was done independently, or that the records are complete.
 - The install places 66 files, while the release contents list names 65 of them. The package file `muster_restart/__init__.py` is placed as package machinery and stands outside the contents list that the release contents sweep walks.
 - Interpreter artefact files, for example under `__pycache__` directories, can appear in a tree the product has run in. They are artefacts of a run, not product files.
