@@ -99,6 +99,7 @@ def test_v12t1_clean_clone_suite_runs_green():
     importlib.import_module("muster_restart.kernel")
     inner_env = dict(os.environ)
     inner_env["MUSTER_V12T1_INNER"] = "1"
+    inner_env.pop("PYTHONPATH", None)
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "tests_restart", "-q",
          "--deselect",

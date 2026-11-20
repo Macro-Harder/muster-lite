@@ -12,7 +12,7 @@ no test in the K5 module of this charge claims field 9 completion.
 import json
 from pathlib import Path
 
-from conftest import check, field, result_text, run_case
+from tests_restart.conftest import check, field, result_text, run_case
 
 CASES = "F5/k6_difference_cases.json"
 RECORDING = "F1/k6_recording_cases.json"
@@ -270,7 +270,7 @@ def test_k6t5_precheck_field9_carries_not_a_gate_run():
 def test_k6t5_precheck_no_check_result_or_limb_result_for_check17():
     result, expected = run_case("F4/k6_t5_precheck_cases.json", "precheck")
     assert expected["check_17_check_result"] is None
-    from conftest import checks
+    from tests_restart.conftest import checks
     assert checks(result, 17) == [], (
         "WRONG OUTPUT K6-T5: a CheckResult standing for check 17 in a precheck"
     )

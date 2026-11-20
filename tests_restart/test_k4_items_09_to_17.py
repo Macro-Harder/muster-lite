@@ -12,7 +12,7 @@ no test in this module rests a verdict on it.
 import json
 from pathlib import Path
 
-from conftest import check, checks, field, result_text, run_case
+from tests_restart.conftest import check, checks, field, result_text, run_case
 
 CASES = "F5/k4_items_09_to_17_cases.json"
 

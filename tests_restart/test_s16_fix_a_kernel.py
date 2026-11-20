@@ -10,7 +10,7 @@ list), and the S16U-01 kernel acceptance limb standing.
 
 import hashlib
 
-from conftest import check, field
+from tests_restart.conftest import check, field
 
 
 def _staffed_input(**overrides):

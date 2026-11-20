@@ -54,7 +54,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from conftest import check, field, require_kernel
+from tests_restart.conftest import check, field, require_kernel
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PRODUCT_DIR = REPO_ROOT / "muster_restart"
