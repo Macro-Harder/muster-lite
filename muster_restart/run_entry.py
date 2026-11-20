@@ -103,6 +103,19 @@ TOOL_DEFECT_STATEMENT = (
     "about the stage records.")
 TOOL_DEFECT_REPAIR_ACT = "a tool repair, not a restaffing act"
 
+# The failures the kernel and presentation calls can raise on
+# malformed input or an unreadable file: type and value errors
+# (decode and JSON errors ride as value errors), missing keys,
+# attribute and index errors on malformed records, read errors
+# and runtime failures such as recursion depth. A coding error
+# in either module (a name error, an import error) stands
+# outside this tuple on purpose, so it propagates instead of
+# reading as an input defect.
+_EXPECTED_CALL_FAILURES = (
+    TypeError, ValueError, KeyError, AttributeError, IndexError,
+    OSError, RuntimeError,
+)
+
 _CANNOT_START_FIELDS = [
     "outcome word",
     "kind",
@@ -323,7 +336,7 @@ def _finish_started_run(result_record, invocation):
     try:
         forms = _presentation_module.render_forms(result_record)
         reports = _compare_forms(result_record, forms)
-    except Exception as exc:
+    except _EXPECTED_CALL_FAILURES as exc:
         outcome = _base_outcome(4)
         outcome["result_record"] = result_record
         outcome["defect_reports"] = [{
@@ -695,12 +708,13 @@ def run_invocation(invocation):
         return blocked
     try:
         result_record = _kernel_module.compute_result(invocation)
-    except Exception:
-        # S17B-07 cure: no internal error text stands in a cause.
+    except _EXPECTED_CALL_FAILURES as exc:
+        # S17B-07 cure stands: no internal error text stands in
+        # a cause; the cause names the failure kind only.
         return _cannot_start(
             "tool failure", invocation,
             "a failure of the tool itself before a result record "
-            "stands")
+            "stands (failure kind: %s)" % type(exc).__name__)
     if result_record is None:
         return _cannot_start(
             "tool failure", invocation,
