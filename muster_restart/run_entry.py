@@ -1209,7 +1209,22 @@ def _parse_command_line(args):
                     "which the closed group list does not state, "
                     "so the invocation does not state a run input "
                     "in the RunInput form" % group)
-            entry = {"path": path, "group": group}
+            # The standing of the named file is stated at this
+            # boundary, where the command line assembles the
+            # invocation: file_stands stands False only where
+            # nothing stands at the named path, so such a file
+            # enters the kernel as absent under the entry
+            # contract. A path standing in another form, a
+            # directory, a FIFO or a symlink whose target does
+            # not resolve, is not stated absent: the kernel
+            # states its other form standing, under the
+            # S17B-17 cure. A structured input assembled
+            # elsewhere states its own standing and is untouched
+            # here.
+            candidate = Path(path)
+            entry = {"path": path, "group": group,
+                     "file_stands": candidate.exists()
+                     or candidate.is_symlink()}
             invocation["supplied_files"].append(entry)
         else:
             invocation[_OPTION_FIELDS[name]] = value
